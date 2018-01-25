@@ -136,13 +136,14 @@ class Cookier():
 
     @name.setter
     def name(self, name: str):
-        """Set the cookier's name."""
+        """Setter for the cookier's name."""
         if len(name) > Cookier.name_maxlen:
             raise ValueError('Name is too long.')
         self.__name = name
 
     @property
     def wallet(self) -> int:
+        """Getter for wallet"""
         """Get the cookier's wallet"""
         return self.__wallet
 

@@ -124,7 +124,7 @@ class RSAUser():
         if not os.path.exists(os.path.dirname(pubkey_path)):
             os.makedirs(os.path.dirname(pubkey_path))
         # Generate new priv/pub keys
-        self.__privkey = RSA.generate(keylen)
+        self.__privkey = RSA.generate(RSAUser.keylen)
         self.__pubkey = self.__privkey.publickey()
         with open(pubkey_path, 'w') as f:
             key = self.__pubkey.exportKey('DER')

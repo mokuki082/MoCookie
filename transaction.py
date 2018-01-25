@@ -1,13 +1,15 @@
 """All types of transactions in MoCookie."""
 
 from person import Cookier
+from datetime import datetime
 
 
 class Transaction():
     """Generic Transaction class."""
 
     def __init__(self, protocol: str, recent_block: str, content: str,
-                 cookiers: list):
+                 cookiers: list, cookies: int,
+                 timestamp=datetime.now(): 'datetime.datetime'):
         """Constructor.
 
         Keyword arguments:
@@ -15,46 +17,61 @@ class Transaction():
         recent_block -- the hash of a recent block as a string.
         content -- body of the transaction. Limit: 100 characters.
         cookiers -- list of cookiers involved in the transaction. Limit: 2-3.
+        cookies -- number of cookies involved
+        timestamp -- timestamp of the transaction. Default to datetime.now()
         """
         self._protocol = protocol
         self._recent_block = recent_block
         self._content = content  # 100 characters limit
         self._cookiers = cookiers  # 2-3 length limit
+        self._cookies = cookies
+        self._timestamp = str(timestamp)
         self.validate()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Give the string representation of the transaction.
 
         Returns:
-        protocol|recent_block|pubk1,pubk2...,pubkn|content
+        protocol|recent_block|content|pubk1,pubk2...,pubkn|cookies|timestamp
 
         """
         pubks = [i.pubk for i in self._cookiers]
         return '%s|%s|%s|%s' % (self._protocol,
                                 self._recent_block,
                                 ','.join(pubks),
-                                self._content)
+                                self._content,
+                                self._timestamp)
 
     def validate(self):
         """Validate the transaction at a basic level."""
+        # Type checking
         if not isinstance(self._protocol, str):
-            raise TypeError('Transaction(a,b,c,d): a must be of type str.')
+            raise TypeError('protocol must be of type str.')
         if not isinstance(self._recent_block, str):
-            raise TypeError('Transaction(a,b,c,d): b must be of type str.')
+            raise TypeError('recent_block must be of type str.')
         if not isinstance(self._content, str):
-            raise TypeError('Transaction(a,b,c,d): c must be of type str.')
+            raise TypeError('content must be of type str.')
         if not isinstance(self._cookiers, list):
-            raise TypeError('Transaction(a,b,c,d): d must be of type list.')
+            raise TypeError('cookiers must be of type list.')
+        if not isinstance(self._cookies, int):
+            raise TypeError('cookies must be of type int.')
         for cookier in self._cookiers:
             if not isinstance(cookier, Cookier):
                 err_ms = 'Transaction(a,b,c,d): d must contain Cookier only.'
                 raise TypeError(err_ms)
+
+        # Value Checking
+        if len(self._protocol) != 2:
+            raise ValueError('protocol is a 2 character string.')
         if len(self._content) > 100:
-            err_ms = 'Transaction(a,b,c,d): c cannot be longer than 100 chars.'
-            raise ValueError(err_ms)
-        if len(self._cookiers) > 3:
-            err_ms = 'Transaction(a,b,c,d): d cannot have more than 3 elements'
-            raise ValueError(err_ms)
+            raise ValueError('content cannot be longer than 100 chars.')
+        if len(self._cookiers) > 3 or len(self._cookiers) < 2:
+            raise ValueError('length of cookiers must be 2-3')
+        if self._cookies > 99:
+            err_msg = 'Each transaction can only involve up to 10 cookies.'
+            raise ValueError(err_msg)
+        if datetime.now() - self._timestamp < 0:
+            raise ValueError('Incorrect transaction timestamp')
         try:
             self.validate_further()
         except NotImplementedError:
@@ -86,36 +103,36 @@ class GiveCookieTransaction(Transaction):
         super().__init__('gc', recent_block, reason, [giver, receiver])
 
     @property
-    def reason(self):
+    def reason(self) -> str:
         """Get the reason."""
         return self._content
 
     @reason.setter
-    def reason(self, reason):
+    def reason(self, reason: str):
         """Set the reason."""
         if len(reason) > 100:
             raise ValueError('reason cannot be more than 100 characters.')
         self._content = reason
 
     @property
-    def giver(self):
+    def giver(self) -> 'Cookier':
         """Get the giver."""
         return self._cookiers[0]
 
     @giver.setter
-    def giver(self, giver):
+    def giver(self, giver: 'Cookier'):
         """Set the giver."""
         if not isinstance(giver, Cookier):
             raise TypeError('giver must be of type Cookier.')
         self._cookiers[0] = giver
 
     @property
-    def receiver(self):
+    def receiver(self) -> 'Cookier':
         """Get the receiver."""
         return self._cookiers[1]
 
     @receiver.setter
-    def receiver(self, receiver):
+    def receiver(self, receiver: 'Cookier'):
         """Set the receiver."""
         if not isinstance(receiver, Cookier):
             raise TypeError('receiver must be of type Cookier.')
@@ -125,7 +142,6 @@ class GiveCookieTransaction(Transaction):
         """Recalculate A, B and C's cookie wallets."""
         self._cookiers[0].wallet -= 1
         self._cookiers[1].wallet += 1
-
 
 
 class ReceiveCookieTransaction(Transaction):
@@ -144,36 +160,36 @@ class ReceiveCookieTransaction(Transaction):
         super().__init__('rc', recent_block, cookie_type, [receiver, giver])
 
     @property
-    def cookie_type(self):
+    def cookie_type(self) -> str:
         """Get the cookie_type."""
         return self._content
 
     @cookie_type.setter
-    def cookie_type(self, cookie_type):
+    def cookie_type(self, cookie_type: str):
         """Set the cookie_type."""
         if len(cookie_type) > 100:
             raise ValueError('cookie_type cannot be more than 100 characters.')
         self._content = cookie_type
 
     @property
-    def receiver(self):
+    def receiver(self) -> 'Cookier':
         """Get the receiver."""
         return self._cookiers[0]
 
     @receiver.setter
-    def receiver(self, receiver):
+    def receiver(self, receiver: 'Cookier'):
         """Set the receiver."""
         if not isinstance(receiver, Cookier):
             raise TypeError('receiver must be of type Cookier.')
         self._cookiers[0] = receiver
 
     @property
-    def giver(self):
+    def giver(self) -> 'Cookier':
         """Get the giver."""
         return self._cookiers[1]
 
     @giver.setter
-    def giver(self, giver):
+    def giver(self, giver: 'Cookier'):
         """Set the giver."""
         if not isinstance(giver, Cookier):
             raise TypeError('giver must be of type Cookier.')
@@ -202,36 +218,40 @@ class CollapseCookieTransaction(Transaction):
                          [giver, middler, receiver])
 
     @property
-    def cookie_type(self):
+    def cookie_type(self) -> str:
         """Get the cookie_type."""
         return self._content
 
     @cookie_type.setter
-    def cookie_type(self, cookie_type):
-        """Set the cookie_type."""
+    def cookie_type(self, cookie_type: str):
+        """Set the cookie_type.
+
+        Keyword argument:
+        cookie_type -- a string, cannot be more than 100 characters
+        """
         if len(cookie_type) > 100:
             raise ValueError('cookie_type cannot be more than 100 characters.')
         self._content = cookie_type
 
     @property
-    def giver(self):
+    def giver(self) -> 'Cookier':
         """Get the giver."""
         return self._cookiers[0]
 
     @giver.setter
-    def giver(self, giver):
+    def giver(self, giver: 'Cookier'):
         """Set the giver."""
         if not isinstance(giver, Cookier):
             raise TypeError('giver must be of type Cookier.')
         self._cookiers[0] = giver
 
     @property
-    def receiver(self):
+    def receiver(self) -> 'Cookier':
         """Get the receiver."""
         return self._cookiers[1]
 
     @receiver.setter
-    def receiver(self, receiver):
+    def receiver(self, receiver: 'Cookier'):
         """Set the receiver."""
         if not isinstance(receiver, Cookier):
             raise TypeError('receiver must be of type Cookier.')
