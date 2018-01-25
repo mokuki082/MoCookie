@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Encryption related classes."""
+
 import os
 import binascii
 
@@ -41,8 +44,58 @@ def base642bin(base64_str: bytes) -> bytes:
     return binascii.a2b_base64(base64_str)
 
 
-class RSAEncryption():
-    """Public key encryption using RSA."""
+def RSA_verify(message: str, signature: str, pubkey: str) -> bool:
+    """Verify a message using its signature.
+
+    Keyword arguments:
+    message -- the message
+    signature -- the signature in base64 ascii string
+    pubkey -- sender's public key in base64 ascii string
+
+    Returns:
+    A boolean
+
+    """
+    if not isinstance(message, str):
+        raise ValueError('message not a string')
+    if not isinstance(signature, str):
+        raise ValueError('signature not a string')
+    if not isinstance(pubkey, str):
+        raise ValueError('pubkey not a string')
+    # Decode parameters
+    signature = base642bin(bytes(signature, 'ascii'))
+    pubkey = base642bin(bytes(pubkey, 'ascii'))
+    # Verify
+    key = RSA.importKey(pubkey)
+    h = SHA512.new(bytes(message, 'utf-8'))
+    verifier = PKCS1_PSS.new(key)
+    if verifier.verify(h, signature):
+        return True
+    return False
+
+
+def RSA_encrypt(message: str, pubk: str) -> str:
+    """Encrypt a message using a given RSA public key.
+
+    Keyword arguments:
+    message -- a message in string
+    pubk -- a public key in base64 ascii string
+
+    Returns:
+    ciphertext in base 64 format as a string
+
+    """
+    # Decode public key
+    pubk = base642bin(bytes(pubk, 'ascii'))
+    pubk = RSA.importKey(pubk)
+    # Encrypt message
+    cipher = PKCS1_OAEP.new(pubk)
+    ciphertext = cipher.encrypt(bytes(message, 'utf-8'))
+    return str(bin2base64(ciphertext), 'ascii')
+
+
+class RSAUser():
+    """Create an RSA user."""
 
     keylen = 2048
 
@@ -66,7 +119,7 @@ class RSAEncryption():
             self.__privkey = RSA.importKey(key)
 
     def generate_keys(self, pubkey_path: str, privkey_path: str):
-        """Generate new keys and store in given files."""
+        """Generate new keys and store the keys in DER format."""
         # Create directories if doesn't exist
         if not os.path.exists(os.path.dirname(pubkey_path)):
             os.makedirs(os.path.dirname(pubkey_path))
@@ -87,25 +140,6 @@ class RSAEncryption():
             return None
         key = self.__pubkey.exportKey('DER')
         return str(bin2base64(key), 'ascii')
-
-    def encrypt(self, message: str, pubk: str) -> str:
-        """Encrypt a message using a given public key.
-
-        Keyword arguments:
-        message -- a message in string
-        pubk -- a public key in base64 ascii string
-
-        Returns:
-        ciphertext in base 64 format as a string
-
-        """
-        # Decode public key
-        pubk = base642bin(bytes(pubk, 'ascii'))
-        pubk = RSA.importKey(pubk)
-        # Encrypt message
-        cipher = PKCS1_OAEP.new(pubk)
-        ciphertext = cipher.encrypt(bytes(message, 'utf-8'))
-        return str(bin2base64(ciphertext), 'ascii')
 
     def decrypt(self, ciphertext: str) -> str:
         """Decrypt a ciphertext using self's private key.
@@ -144,32 +178,3 @@ class RSAEncryption():
         signer = PKCS1_PSS.new(self.__privkey)
         signature = signer.sign(h)
         return str(bin2base64(signature), 'ascii')
-
-    def verify(self, message: str, signature: str, pubkey: str) -> bool:
-        """Verify a message.
-
-        Keyword arguments:
-        message -- the message
-        signature -- the signature in base64 ascii string
-        pubkey -- sender's public key in base64 ascii string
-
-        Returns:
-        A boolean
-
-        """
-        if not isinstance(message, str):
-            raise ValueError('message not a string')
-        if not isinstance(signature, str):
-            raise ValueError('signature not a string')
-        if not isinstance(pubkey, str):
-            raise ValueError('pubkey not a string')
-        # Decode parameters
-        signature = base642bin(bytes(signature, 'ascii'))
-        pubkey = base642bin(bytes(pubkey, 'ascii'))
-        # Verify
-        key = RSA.importKey(pubkey)
-        h = SHA512.new(bytes(message, 'utf-8'))
-        verifier = PKCS1_PSS.new(key)
-        if verifier.verify(h, signature):
-            return True
-        return False
