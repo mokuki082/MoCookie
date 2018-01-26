@@ -1,10 +1,9 @@
 # Server API Documentation
 ## Use cases
 ### #1 Give cookie
-
 **Brief Description**
 A sends a `gc` transaction with various arguments to the server.
-Server validates the transaction and add it into the pool.
+Server validates the transaction and add it into the pool, then updates user status upon block commit.
 
 **Actors** User A, User B.
 
@@ -14,7 +13,7 @@ Server validates the transaction and add it into the pool.
 
 **Preconditions** A and B are both registered in the database. A has the latest block's hash.
 
-**Postconditions** Transaction is either discarded or added to the pool.
+**Postconditions** Transaction is either discarded, or added to the pool and committed at the next commit.
 
 **Normal flow**
 1. Receive message from A: `encrypted_message|certificate`.
@@ -44,11 +43,11 @@ Server validates the transaction and add it into the pool.
 - Decryption failure -> discard message -> notify A (with timeout).
 - Validation/format failure -> discard message -> notify A (with timeout).
 
+---
 ### #2 Receive cookie
-
 **Brief Description**
 A sends a `rc` transaction with various arguments to the server.
-Server validates the transaction and add it into the pool.
+Server validates the transaction and add it into the pool, update user status upon block commit.
 
 **Actors** User A, User B.
 
@@ -58,7 +57,9 @@ Server validates the transaction and add it into the pool.
 
 **Preconditions** A and B are both registered in the database. A has the latest block's hash. B has previously owed A more than or equal to the cookies involved in this request.
 
-**Postconditions** Transaction is either discarded or added to the pool.
+**Postconditions** Invalid transactions will be discarded immediately.
+A seemingly valid transaction will be added to the pool and
+committed at the next commit if it is valid, otherwise it will be left in the pool for 24 hours and taken out if it is still not committed.
 
 **Normal flow**
 1. Receive message from A: `encrypted_message|certificate`.
@@ -87,19 +88,83 @@ Server validates the transaction and add it into the pool.
 **Alternate flow**
 - Decryption failure -> discard message -> notify A (with timeout).
 - Validation/format failure -> discard message -> notify A (with timeout)
--  A's outstanding cookies < `num_cookies`
+-  A's outstanding cookies to B < `num_cookies`
   - If the transaction happened more than 24 hours ago:
     1. Put the transaction into `InvalidTransaction` category.
     1. Delete transaction from the pool.
   - Otherwise, put the transaction back to the pool.
 
+---
 ### #3 Collapse a chain
+**Brief Description**
+A, B and C each sends a `ic` (individual collapse) transaction with various arguments to the server.
+Server validates the transactions and merge them into one.
+The combined transaction `cc` (combined collapse) will be committed if all three individuals have signed a valid transaction.
 
+**Actors** User A, User B, User C.
 
+**Trigger** A, B or C sends a `ic` transaction request.
+
+**Related use cases** All users are expected to call #4 before #1.
+
+**Preconditions** A, B and C are registered in the database and have the latest block's hash upon their transaction time. A owes B more than or equal to `num_cookies` and B owes C more than or equal to `num_cookies`.
+
+**Postconditions** Invalid transactions will be discarded immediately.
+A seemingly valid transaction will be added to the pool and
+committed at the next commit if it is valid, otherwise it will be left in the pool for 24 hours and taken out if it is still not committed.
+
+**Normal flow**
+1. Receive message from A: `encrypted_message|certificate`.
+1. Decrypt the message using the server's private key.
+1. Check that the message includes these attributes in the correct format:
+  - `A_pubk`
+  - `protocol_id`
+  - `most_recent_hash`
+  - `B_pubk`
+  - `C_pubk`
+  - `num_cookies`
+  - `timestamp`
+1. Check that `A_pubk` is registered in the database.
+1. Validate `certificate` using `A_pubk`.
+1. Check that `timestamp` is later than A's most recent transaction timestamp.
+1. Check that `B_pubk` and `C_pubk` are in the database.
+1. Check that `num_cookies <= 99`.
+1. Check that `cookie_type` is of length less than 100.
+1. Add transaction to the pool.
+1. Notify A that the transaction is added to the pool.
+1. Committer adds all transactions into a new block.
+1. Check that A's outstanding cookies to B >= `num_cookies`.
+1. Check that B's outstanding cookies to C >= `num_cookies`
+1. Check whether there is a `cc` transaction in the new block with matching information.
+  - If there exists such transaction:
+    1. add A's signature into the transaction.
+    1. If not all three users have signed, put the block back into the pool.
+    1. If all three users have signed:
+      1. Decrement A's outstanding cookies to B by `num_cookies`.
+      2. Decrement B's outstanding cookies to C by `num_cookies`.
+      3. Increment A's outstanding cookies to C by `num_cookies`.
+  - Otherwise, create a `cc` transaction with all above information and A's signature, and put it back into the pool.
+1. New block is committed.
+
+**Alternate flow**
+- Decryption failure -> discard message -> notify A (with timeout).
+- Validation/format failure -> discard message -> notify A (with timeout)
+- A's outstanding cookies to B < `num_cookies`
+  - If the transaction happened more than 24 hours ago:
+    1. Put the transaction into `InvalidTransaction` category.
+    1. Delete transaction from the pool.
+  - Otherwise, put the transaction back to the pool.
+- B's outstanding cookies to C < `num_cookies`
+  - If the transaction happened more than 24 hours ago:
+    1. Put the transaction into `InvalidTransaction` category.
+    1. Delete transaction from the pool.
+  - Otherwise, put the transaction back to the pool.
+
+___
+### #4 Collapse
+___
 ### #4 Get latest blockchain (up to a certain hash)
-
-
+___
 ### #5 Get Invalid Transactions
-
-
+___
 ### #6 Validate blockchain
