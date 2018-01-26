@@ -141,17 +141,6 @@ class Cookier():
             raise ValueError('Name is too long.')
         self.__name = name
 
-    @property
-    def wallet(self) -> int:
-        """Getter for wallet"""
-        """Get the cookier's wallet"""
-        return self.__wallet
-
-    @wallet.setter
-    def wallet(self, wallet):
-        """Set the cookier's wallet"""
-        self.__wallet = wallet
-
     def verify(self, message: str, signature: str) -> bool:
         """Verify a message sent by the Cookier.
 
