@@ -1,13 +1,18 @@
 # Server API Documentation
+## Notations
+|Notation|Definition|
+|:--:|:--:|
+|`O(A,B)`|The number of cookies A owes B in the database|
+
 ## Use cases
 ### #1 Give cookie
 **Brief Description**
 A sends a `gc` transaction with various arguments to the server.
-Server validates the transaction and add it into the pool, then updates user status upon block commit.
+Server validates the transaction and adds it into the pool, then updates user status upon block commit.
 
 **Actors** User A, User B.
 
-**Actor interests** User A wish to give User B some cookies and want to record this.
+**Actor interests** User A wishes to give User B some cookies and wants to record this.
 
 **Trigger** A sends a `gc` transaction request.
 
@@ -18,21 +23,22 @@ Server validates the transaction and add it into the pool, then updates user sta
 **Postconditions** Transaction is either discarded, or added to the pool and committed at the next commit.
 
 **Normal flow**
-1. Receive message from A: `encrypted_message|certificate`.
+1. Receive message from A: `A_pubk|encrypted_message|certificate`.
+1. Validate `certificate` using `A_pubk` and `encrypted_message`
 1. Decrypt the message using the server's private key.
 1. Check that the message includes these attributes in the correct format:
   - `protocol_id`: A 2 character protocol id. `gc` in this case.
-  - `A_pubk`: User A's public key.
   - `most_recent_hash`: Most recent block hash.
-  - `B_pubk`
-  - `num_cookies`
-  - `reason`
-  - `timestamp`
+  - `B_pubk`: B's public key.
+  - `num_cookies`: Number of cookies involved in the tranasaction.
+  - `reason`: Reason of transaction (optional)
+  - `timestamp`: Current unix time (GMT) as a decimal integer.
+  - `signature`: Concatenate the above with `|` and signed by A.
 1. Check that `A_pubk` is registered in the database.
 1. Validate `certificate` using `A_pubk`.
 1. Check that `timestamp` is later than A's most recent transaction timestamp.
 1. Check that `B_pubk` is in the database.
-1. Check that `num_cookies <= 99`.
+1. Check that `O(A,C) + num_cookies <= 99`.
 1. Check that `reason` is of length less than 100.
 1. Add transaction to the pool.
 1. Notify A that transaction is added to the pool.

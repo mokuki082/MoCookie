@@ -1,0 +1,16 @@
+2018-01-29 22:36:44.663 AEDT [6447] LOG:  listening on IPv6 address "::1", port 5432
+2018-01-29 22:36:44.663 AEDT [6447] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2018-01-29 22:36:44.664 AEDT [6447] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2018-01-29 22:36:44.680 AEDT [6448] LOG:  database system was shut down at 2018-01-29 22:36:01 AEDT
+2018-01-29 22:36:44.685 AEDT [6447] LOG:  database system is ready to accept connections
+2018-01-29 22:37:20.066 AEDT [6459] FATAL:  database "mokuhuang" does not exist
+2018-01-29 22:59:00.442 AEDT [6913] FATAL:  role "postgres" does not exist
+2018-01-29 22:59:09.966 AEDT [6915] FATAL:  role "postgres" does not exist
+2018-01-29 23:01:43.143 AEDT [6946] FATAL:  database "mokuhuang" does not exist
+2018-01-29 23:01:50.434 AEDT [6951] FATAL:  role "root" does not exist
+2018-01-29 23:03:12.690 AEDT [6964] FATAL:  database "u" does not exist
+2018-01-29 23:03:17.748 AEDT [6967] FATAL:  database "du" does not exist
+2018-01-29 23:06:41.694 AEDT [6447] LOG:  received smart shutdown request
+2018-01-29 23:06:41.696 AEDT [6447] LOG:  worker process: logical replication launcher (PID 6454) exited with exit code 1
+2018-01-29 23:06:41.696 AEDT [6449] LOG:  shutting down
+2018-01-29 23:06:41.704 AEDT [6447] LOG:  database system is shut down
