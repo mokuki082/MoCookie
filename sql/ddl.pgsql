@@ -4,38 +4,49 @@ CREATE TABLE IF NOT EXISTS CookieUser (
 );
 
 CREATE TABLE IF NOT EXISTS Transaction (
-  id SERIAL PRIMARY KEY,
-  invoker TEXT NOT NULL REFERENCES CookieUser(pubk),
-  transaction_time TIMESTAMP,
-  PRIMARY KEY (invoker, transaction_time)
+  id SERIAL PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS GiveCookieTransaction (
-  transaction_id INT REFERENCES Transaction(id) PRIMARY KEY,
+  transaction_id INT REFERENCES Transaction(id) UNIQUE NOT NULL,
+  invoker TEXT NOT NULL REFERENCES CookieUser(pubk),
+  transaction_time TIMESTAMP,
   receiver_pubk TEXT REFERENCES CookieUser(pubk) NOT NULL,
   recent_hash TEXT REFERENCES Block(curr_hash) NOT NULL,
   num_cookies INT NOT NULL,
   reason VARCHAR(100),
   signature TEXT NOT NULL,
   -- Constraints
-  CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0),
+  -- Primary key
+  PRIMARY KEY (invoker, transaction_time)
 );
 
 CREATE TABLE IF NOT EXISTS ReceiveCookieTransaction (
-  transaction_id INT REFERENCES Transaction(id) PRIMARY KEY,
+  transaction_id INT REFERENCES Transaction(id) UNIQUE NOT NULL,
+  invoker TEXT NOT NULL REFERENCES CookieUser(pubk),
+  transaction_time TIMESTAMP,
   sender_pubk TEXT REFERENCES CookieUser(pubk) NOT NULL,
   recent_hash TEXT REFERENCES Block(curr_hash) NOT NULL,
   num_cookies INT NOT NULL,
   cookie_type VARCHAR(100),
   signature TEXT NOT NULL,
   -- Constraints
-  CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0),
+  -- Primary key
+  PRIMARY KEY (invoker, transaction_time)
 );
 
 CREATE TABLE IF NOT EXISTS ChainCollapseTransaction (
-  transaction_id INT REFERENCES Transaction(id) PRIMARY KEY,
+  transaction_id INT REFERENCES Transaction(id) UNIQUE NOT NULL,
+  invoker TEXT NOT NULL REFERENCES CookieUser(pubk),
+  transaction_time TIMESTAMP,
+  invoker TEXT NOT NULL REFERENCES CookieUser(pubk),
+  transaction_time TIMESTAMP,
   recent_hash TEXT REFERENCES Block(curr_hash) NOT NULL,
   signature TEXT NOT NULL,
+  -- Primary key
+  PRIMARY KEY (invoker, transaction_time)
 );
 
 CREATE TABLE IF NOT EXISTS CombinedChainCollapseTransaction (
@@ -68,6 +79,17 @@ CREATE TABLE IF NOT EXISTS CombinedPairCancelTransaction (
   CONSTRAINT ccct_num_cookies_check CHECK (num_cookies > 0),
 );
 
+CREATE TABLE IF NOT EXISTS AddUserTransaction (
+  transaction_id INT REFERENCES Transaction(id) PRIMARY KEY,
+  join_time TIMESTAMP NOT NULL,
+  user_pubk TEXT REFERENCES CoookieUser(pubk) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS RemoveUserTransaction (
+  transaction_id INT REFERENCES Transaction(id) PRIMARY KEY,
+  remove_time TIMESTAMP NOT NULL,
+  user_pubk TEXT REFERENCES CoookieUser(pubk) UNIQUE NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS Block (
   curr_hash TEXT PRIMARY KEY,
