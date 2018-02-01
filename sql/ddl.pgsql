@@ -1,3 +1,4 @@
+DROP SCHEMA Blockchain CASCADE;
 CREATE SCHEMA IF NOT EXISTS Blockchain;
 
 CREATE TABLE IF NOT EXISTS Blockchain.CookieUser (
@@ -11,48 +12,48 @@ CREATE TABLE IF NOT EXISTS Blockchain.Transaction (
 
 CREATE TABLE IF NOT EXISTS Blockchain.Block (
   curr_hash TEXT PRIMARY KEY,
-  prev_hash TEXT REFERENCES Blockchain.Block(curr_hash) DEFERRABLE,
+  prev_hash TEXT NOT NULL, -- TODO: Use trigger to make sure it's either genesis or references previous blocks
   ordering SERIAL UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
-  id INT REFERENCES Blockchain.Transaction(id) UNIQUE NOT NULL,
+  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
-  transaction_time TIMESTAMP,
+  transaction_time TIMESTAMP NOT NULL,
   receiver TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   recent_hash TEXT REFERENCES Blockchain.Block(curr_hash) NOT NULL,
   num_cookies INT NOT NULL,
   reason VARCHAR(100),
   signature TEXT NOT NULL,
-  -- Constraints
-  CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0),
-  -- Primary key
-  PRIMARY KEY (invoker, transaction_time)
+  -- Key constraint
+  CONSTRAINT gct_invoker_ttime_key UNIQUE(invoker, transaction_time),
+  -- Check constraint
+  CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
-  id INT REFERENCES Blockchain.Transaction(id) UNIQUE NOT NULL,
+  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
-  transaction_time TIMESTAMP,
+  transaction_time TIMESTAMP NOT NULL,
   sender_pubk TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   recent_hash TEXT REFERENCES Blockchain.Block(curr_hash) NOT NULL,
   num_cookies INT NOT NULL,
   cookie_type VARCHAR(100),
   signature TEXT NOT NULL,
+  -- Key constraint
+  CONSTRAINT rct_invoker_ttime_key UNIQUE(invoker, transaction_time),
   -- Constraints
-  CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0),
-  -- Primary key
-  PRIMARY KEY (invoker, transaction_time)
+  CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
-  id INT REFERENCES Blockchain.Transaction(id) UNIQUE NOT NULL,
+  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
-  transaction_time TIMESTAMP,
+  transaction_time TIMESTAMP NOT NULL,
   recent_hash TEXT REFERENCES Blockchain.Block(curr_hash) NOT NULL,
   signature TEXT NOT NULL,
   -- Primary key
-  PRIMARY KEY (invoker, transaction_time)
+  CONSTRAINT cct_invoker_ttime_key UNIQUE(invoker, transaction_time)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
@@ -100,7 +101,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.RemoveUserTransaction (
 
 CREATE TABLE IF NOT EXISTS Blockchain.IncludeTransaction (
   block TEXT REFERENCES Blockchain.Block(curr_hash),
-  transaction_id INT REFERENCES Blockchain.Transaction(id) NOT NULL,
+  transaction_id INT REFERENCES Blockchain.Transaction(id),
   PRIMARY KEY(block, transaction_id)
 );
 
