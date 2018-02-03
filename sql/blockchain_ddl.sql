@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.Block (
   */
   id SERIAL PRIMARY KEY,
   curr_hash TEXT UNIQUE,
-  prev_hash TEXT NOT NULL
+  prev_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
   Trigger:
     gct_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   invoker TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
   receiver TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
-  recent_block INT REFERENCES Blockchain.Block(id) NOT NULL,
+  recent_block INT REFERENCES Blockchain.Block(id)
+    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   num_cookies INT NOT NULL,
   reason VARCHAR(100),
   signature TEXT NOT NULL,
@@ -66,11 +68,13 @@ CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
   Trigger:
     rct_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   invoker TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
   sender TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
-  recent_block INT REFERENCES Blockchain.Block(id) NOT NULL,
+  recent_block INT REFERENCES Blockchain.Block(id)
+    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   num_cookies INT NOT NULL,
   cookie_type VARCHAR(100),
   signature TEXT NOT NULL,
@@ -88,10 +92,12 @@ CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
   Trigger:
     cct_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   invoker TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
-  recent_block INT REFERENCES Blockchain.Block(id) NOT NULL,
+  recent_block INT REFERENCES Blockchain.Block(id)
+    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   signature TEXT NOT NULL,
   -- Primary key
   CONSTRAINT cct_invoker_ttime_key UNIQUE(invoker, transaction_time)
@@ -105,13 +111,17 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
   Trigger:
     ccct_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   start_user TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
   mid_user TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
   end_user TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
-  start_user_transaction INT REFERENCES Blockchain.ChainCollapseTransaction(id),
-  mid_user_transaction INT REFERENCES Blockchain.ChainCollapseTransaction(id),
-  end_user_transaction INT REFERENCES Blockchain.ChainCollapseTransaction(id),
+  start_user_transaction INT REFERENCES Blockchain.ChainCollapseTransaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  mid_user_transaction INT REFERENCES Blockchain.ChainCollapseTransaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  end_user_transaction INT REFERENCES Blockchain.ChainCollapseTransaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   num_cookies INT NOT NULL,
   -- Constraints
   CONSTRAINT ccct_num_cookies_check CHECK (num_cookies > 0)
@@ -125,10 +135,12 @@ CREATE TABLE IF NOT EXISTS Blockchain.PairCancelTransaction (
   Trigger:
     pct_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   invoker TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
-  recent_block INT REFERENCES Blockchain.Block(id) NOT NULL,
+  recent_block INT REFERENCES Blockchain.Block(id)
+    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   signature TEXT NOT NULL,
   -- Constraints
   CONSTRAINT pct_invoker_ttime_key UNIQUE(invoker, transaction_time)
@@ -142,11 +154,14 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
   Trigger:
     cpct_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   user_a_id INT REFERENCES Blockchain.PairCancelTransaction(id),
   user_b_id INT REFERENCES Blockchain.PairCancelTransaction(id),
-  user_a TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
-  user_b TEXT REFERENCES Blockchain.ValidUser(pubk) NOT NULL,
+  user_a TEXT REFERENCES Blockchain.ValidUser(pubk)
+    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+  user_b TEXT REFERENCES Blockchain.ValidUser(pubk)
+    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   num_cookies INT NOT NULL,
   -- Constraints
   CONSTRAINT cpct_num_cookies_check CHECK (num_cookies > 0)
@@ -158,7 +173,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.AddUserTransaction (
   Trigger:
     aut_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   join_time TIMESTAMP NOT NULL,
   user_pubk TEXT REFERENCES Blockchain.ValidUser(pubk) UNIQUE NOT NULL
 );
@@ -169,7 +185,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.RemoveUserTransaction (
   Trigger:
     rut_protocol_check: Ensure all transactions are mutually exclusive.
   */
-  id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   remove_time TIMESTAMP NOT NULL,
   user_pubk TEXT REFERENCES Blockchain.ValidUser(pubk) UNIQUE NOT NULL
 );
@@ -184,6 +201,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.IncludeTransaction (
 CREATE TABLE IF NOT EXISTS Blockchain.Pool (
   /* Shows the transactions that are currently in the pool. */
   transaction_id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Debt (

@@ -1,9 +1,10 @@
 DDL=blockchain_ddl.sql
 TRIG=blockchain_triggers.sql
 DCL=blockchain_dcl.sql
+DML=blockchain_dml.sql
 
 all:
-	cat $(DDL) $(TRIG) $(DCL) | psql mocookie -U mc_admin
+	cat $(DDL) $(TRIG) $(DCL) $(DML) | psql mocookie -U mc_admin
 
 ddl:
 	cat $(DDL) | psql mocookie -U mc_admin

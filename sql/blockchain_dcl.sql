@@ -32,14 +32,11 @@ CREATE OR REPLACE FUNCTION Blockchain.AddGiveCookieTransaction(
       -- Create a generic transaction
       INSERT INTO Blockchain.Transaction(protocol) VALUES ('gct');
       -- Obtain transaction_id
-      tid := (SELECT id
-                 FROM Blockchain.Transaction
-                 ORDER BY id
-                 LIMIT 1);
+      tid := (SELECT id FROM Blockchain.Transaction
+              ORDER BY id LIMIT 1);
       -- Obtain block_id
-      bid := (SELECT id
-                 FROM Blockchain.Block
-                 WHERE curr_hash = recent_hash);
+      bid := (SELECT id FROM Blockchain.Block
+              WHERE curr_hash = recent_hash);
       -- Convert unix time into timestamp format
       ttime := to_timestamp(transaction_time);
       -- Create GiveCookieTransaction
@@ -53,20 +50,35 @@ CREATE OR REPLACE FUNCTION Blockchain.AddGiveCookieTransaction(
 CREATE OR REPLACE FUNCTION Blockchain.AddReceiveCookieTransaction(
       invoker TEXT,
       transaction_time DOUBLE PRECISION,
-      sender_pubk TEXT,
+      sender TEXT,
       recent_hash TEXT,
       num_cookies INT,
       cookie_type VARCHAR(100),
       signature TEXT)
   RETURNS VOID AS
   $$
-    BEGIN
-      -- Create a generic transaction
-      -- Obtain transaction_id
-      -- Obtain block_id
-      -- Create GiveCookieTransaction
-    END
-  $$ LANGUAGE plpgsql SECURITY DEFINER;
+  DECLARE
+    tid INT;
+    bid INT;
+    ttime TIMESTAMP;
+  BEGIN
+    -- Create a generic transaction
+    INSERT INTO Blockchain.Transaction(protocol) VALUES ('rct');
+    -- Obtain transaction_id
+    tid := (SELECT id FROM Blockchain.Transaction
+            ORDER BY id LIMIT 1);
+    -- Obtain block_id
+    bid := (SELECT id FROM Blockchain.Block
+            WHERE curr_hash = recent_hash);
+    -- Convert unix time into timestamp format
+    ttime := to_timestamp(transaction_time);
+    -- Create GiveCookieTransaction
+    INSERT INTO Blockchain.ReceiveCookieTransaction(
+      id, invoker, transaction_time, sender, recent_block,
+      num_cookies, cookie_type, signature
+    ) VALUES (tid, ttime, sender, bid, num_cookies, cookie_type, signaure);
+  END
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.AddCollapseChainTransaction(
       invoker TEXT,

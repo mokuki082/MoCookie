@@ -4,13 +4,15 @@ CREATE OR REPLACE FUNCTION Blockchain.checkPreviousHashFKey()
   $$
     DECLARE
       genesis_hash CONSTANT TEXT := '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+      searched_hash TEXT;
     BEGIN
-      IF (NEW.ordering = 1 AND NEW.prev_hash = gensis_hash) THEN
+      IF (NEW.id = 1 AND NEW.prev_hash IS NULL) THEN
         -- Genesis block must have a all 0 prev_hash
         RETURN NEW;
-      ELSEIF (NEW.prev_hash = (SELECT curr_hash
-                               FROM Blockchain.Block
-                               WHERE NEW.id - 1 = id)) THEN
+      searched_hash := (SELECT curr_hash FROM Blockchain.Block
+                        WHERE NEW.id - 1 = id);
+      ELSEIF (searched_hash IS NOT NULL AND
+              NEW.prev_hash = searched_hash) THEN
         -- Non-genesis block must have previuos block's hash as prev_hash
         RETURN NEW;
       ELSE
