@@ -47,10 +47,10 @@ CREATE OR REPLACE FUNCTION Blockchain.checkTransactionMutualExcl()
                     cct.id = NEW.id OR cpct.id = NEW.id OR
                     pct.id = NEW.id OR cpct.id = NEW.id OR
                     aut.id = NEW.id OR rut.id = NEW.id);
-      IF (occ > 1) THEN
-        RAISE EXCEPTION 'Transaction is not mutually exclusive.';
+      IF (occ == 1) THEN
+        RETURN NULL;
       ELSEIF (occ == 1) THEN
-        RETURN NEW;
+        RAISE EXCEPTION 'Transaction is not mutually exclusive.';
       ELSE
         RAISE EXCEPTION 'Transaction does not exist.';
       END IF;
@@ -60,63 +60,80 @@ CREATE OR REPLACE FUNCTION Blockchain.checkTransactionMutualExcl()
 DROP TRIGGER IF EXISTS gct_mutualexcl_check
   ON Blockchain.GiveCookieTransaction;
 CREATE TRIGGER gct_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.GiveCookieTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.GiveCookieTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS rct_mutualexcl_check
   ON Blockchain.ReceiveCookieTransaction;
 CREATE TRIGGER rct_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.ReceiveCookieTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.ReceiveCookieTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS cct_mutualexcl_check
   ON Blockchain.ChainCollapseTransaction;
 CREATE TRIGGER cct_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.ChainCollapseTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.ChainCollapseTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS ccct_mutualexcl_check
   ON Blockchain.CombinedChainCollapseTransaction;
 CREATE TRIGGER ccct_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.CombinedChainCollapseTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.CombinedChainCollapseTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS pct_mutualexcl_check
   ON Blockchain.PairCancelTransaction;
 CREATE TRIGGER pct_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.PairCancelTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.PairCancelTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS cpct_mutualexcl_check
   ON Blockchain.CombinedPairCancelTransaction;
 CREATE TRIGGER cpct_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.CombinedPairCancelTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.CombinedPairCancelTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS aut_mutualexcl_check
   ON Blockchain.AddUserTransaction;
 CREATE TRIGGER aut_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.AddUserTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.AddUserTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
 
 DROP TRIGGER IF EXISTS rut_mutualexcl_check
   ON Blockchain.RemoveUserTransaction;
 CREATE TRIGGER rut_mutualexcl_check
-  /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF id ON Blockchain.RemoveUserTransaction
+  /* Check that transactions are mutually exclusive. */
+  AFTER INSERT OR UPDATE OF id ON Blockchain.RemoveUserTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+
+CREATE OR REPLACE FUNCTION Blockchain.addToInvalidUser()
+  RETURNS trigger AS
+  /* Insert user into InvalidUser upon deletion */
+  $$
+  BEGIN
+    INSERT INTO Blockchain.InvalidUser(pubk) VALUES (OLD.pubk);
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS validuser_pubk_trig
+  ON Blockchain.ValidUser;
+CREATE TRIGGER validuser_pubk_trig
+  /* Insert user into InvalidUser upon deletion */
+  AFTER DELETE ON Blockchain.ValidUser
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.addToInvalidUser();
