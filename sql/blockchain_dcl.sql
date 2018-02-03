@@ -43,7 +43,10 @@ CREATE OR REPLACE FUNCTION Blockchain.AddGiveCookieTransaction(
       INSERT INTO Blockchain.GiveCookieTransaction(
         id, invoker, transaction_time, receiver, recent_block,
         num_cookies, reason, signature
-      ) VALUES (tid, ttime, receiver, bid, num_cookies, reason, signaure);
+      ) VALUES (tid, invoker, ttime, receiver, bid, num_cookies, reason,
+                signature);
+      -- Add transaction into pool
+      INSERT INTO Blockchain.Pool VALUES (tid);
     END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -77,6 +80,8 @@ CREATE OR REPLACE FUNCTION Blockchain.AddReceiveCookieTransaction(
       id, invoker, transaction_time, sender, recent_block,
       num_cookies, cookie_type, signature
     ) VALUES (tid, ttime, sender, bid, num_cookies, cookie_type, signaure);
+    -- Add transaction to Pool
+    INSERT INTO Blockchain.Pool VALUES (tid);
   END
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

@@ -34,27 +34,52 @@ CREATE OR REPLACE FUNCTION Blockchain.checkTransactionMutualExcl()
   /* Check that all transaction subclasses are mutually exclusive. */
   $$
     DECLARE
-      occ INT;
+      occ INT := 0;
     BEGIN
-      occ := (SELECT COUNT(*)
-              FROM Blockchain.GiveCookieTransaction as gct
-              CROSS JOIN Blockchain.ReceiveCookieTransaction as rct
-              CROSS JOIN Blockchain.ChainCollapseTransaction as cct
-              CROSS JOIN Blockchain.CombinedChainCollapseTransaction as ccct
-              CROSS JOIN Blockchain.PairCancelTransaction as pct
-              CROSS JOIN Blockchain.CombinedPairCancelTransaction as cpct
-              CROSS JOIN Blockchain.AddUserTransaction as aut
-              CROSS JOIN Blockchain.RemoveUserTransaction as rut
-              WHERE gct.id = NEW.id OR rct.id = NEW.id OR
-                    cct.id = NEW.id OR cpct.id = NEW.id OR
-                    pct.id = NEW.id OR cpct.id = NEW.id OR
-                    aut.id = NEW.id OR rut.id = NEW.id);
-      IF (occ == 1) THEN
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.GiveCookieTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.ReceiveCookieTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.ChainCollapseTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.CombinedChainCollapseTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.PairCancelTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.CombinedPairCancelTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.AddUserTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (EXISTS (SELECT 1
+                  FROM Blockchain.RemoveUserTransaction AS t
+                  WHERE t.id = NEW.id)) THEN
+        occ := occ + 1;
+      END IF;
+      IF (occ = 1) THEN
         RETURN NULL;
-      ELSEIF (occ == 1) THEN
-        RAISE EXCEPTION 'Transaction is not mutually exclusive.';
       ELSE
-        RAISE EXCEPTION 'Transaction does not exist.';
+        RAISE EXCEPTION 'Transaction is not mutually exclusive.';
       END IF;
     END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
