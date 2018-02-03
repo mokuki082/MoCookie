@@ -1,3 +1,14 @@
+CREATE OR REPLACE FUNCTION Blockchain.CreateTransaction(protocol VARCHAR(4))
+  RETURNS INT AS
+  $$
+  BEGIN
+  INSERT INTO Blockchain.Transaction(protocol) VALUES (protocol);
+  -- Obtain transaction_id
+  RETURN (SELECT id FROM Blockchain.Transaction
+          ORDER BY id DESC LIMIT 1);
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE OR REPLACE FUNCTION Blockchain.AddUser(pubk TEXT)
   RETURNS VOID AS
   $$
@@ -30,10 +41,7 @@ CREATE OR REPLACE FUNCTION Blockchain.AddGiveCookieTransaction(
       ttime TIMESTAMP;
     BEGIN
       -- Create a generic transaction
-      INSERT INTO Blockchain.Transaction(protocol) VALUES ('gct');
-      -- Obtain transaction_id
-      tid := (SELECT id FROM Blockchain.Transaction
-              ORDER BY id LIMIT 1);
+      tid := Blockchain.CreateTransaction('gct');
       -- Obtain block_id
       bid := (SELECT id FROM Blockchain.Block
               WHERE curr_hash = recent_hash);
@@ -66,10 +74,7 @@ CREATE OR REPLACE FUNCTION Blockchain.AddReceiveCookieTransaction(
     ttime TIMESTAMP;
   BEGIN
     -- Create a generic transaction
-    INSERT INTO Blockchain.Transaction(protocol) VALUES ('rct');
-    -- Obtain transaction_id
-    tid := (SELECT id FROM Blockchain.Transaction
-            ORDER BY id LIMIT 1);
+    tid := Blockchain.CreateTransaction('rct');
     -- Obtain block_id
     bid := (SELECT id FROM Blockchain.Block
             WHERE curr_hash = recent_hash);
@@ -79,7 +84,8 @@ CREATE OR REPLACE FUNCTION Blockchain.AddReceiveCookieTransaction(
     INSERT INTO Blockchain.ReceiveCookieTransaction(
       id, invoker, transaction_time, sender, recent_block,
       num_cookies, cookie_type, signature
-    ) VALUES (tid, ttime, sender, bid, num_cookies, cookie_type, signaure);
+    ) VALUES (tid, invoker, ttime, sender, bid, num_cookies, cookie_type,
+              signature);
     -- Add transaction to Pool
     INSERT INTO Blockchain.Pool VALUES (tid);
   END
@@ -96,19 +102,60 @@ CREATE OR REPLACE FUNCTION Blockchain.AddCollapseChainTransaction(
       signature TEXT)
   RETURNS VOID AS
   $$
+    DECLARE
+      tid INT;
+      bid INT;
+      ttime TIMESTAMP;
+      ccct_id INT;
     BEGIN
       -- Create a generic transaction
-      -- Obtain transaction_id
+      tid := Blockchain.CreateTransaction('cct');
       -- Obtain block_id
-      -- Create GiveCookieTransaction
+      bid := (SELECT id FROM Blockchain.Block
+              WHERE curr_hash = recent_hash);
+      -- Obtain ttime in timestamp format
+      ttime := to_timestamp(transaction_time);
       -- Create CollapseChainTransaction
+      INSERT INTO Blockchain.CombinedCollapseChainTransaction(
+        id, invoker, transaction_time, recent_block, signature
+      ) VALUES (tid, invoker, ttime, bid, signature);
       -- Check if CombinedCollapseChainTransaction exists
-      -- If yes, update the combined transaction
-      -- Otherwise create a combined transaction
+      ccct_id := (SELECT id
+               FROM Blockchain.CombinedCollapseChainTransaction cct
+               JOIN Pool p ON (cct.id = pool.transaction_id)
+               WHERE cct.start_user = start_user AND
+                     cct.mid_user = mid_user AND
+                     cct.end_user = end_user AND
+                     cct.num_cookies = num_cookies);
+      IF (ccct_id IS NULL) THEN
+        -- Create a new ccct
+        ccct_id := Blockchain.CreateTransaction('ccct');
+        INSERT INTO Blockchain.CombinedCollapseChainTransaction (
+          id, start_user, mid_user, end_user, start_user_transaction,
+          mid_user_transaction, end_user_transaction, num_cookies
+        ) VALUES (ccct_id, start_user, mid_user, end_user, NULL, NULL,
+          NULL, num_cookies);
+        INSERT INTO Blockchain.Pool VALUES (ccct_id);
+      END IF;
+      -- Update ccct
+      IF (invoker = start_user) THEN
+        UPDATE Blockchain.CombinedCollapseChainTransaction ccct
+        SET start_user_transaction = tid
+        WHERE ccct.id = ccct_id;
+      ELSEIF (invoker = mid_user) THEN
+        UPDATE Blockchain.CombinedCollapseChainTransaction ccct
+        SET mid_user_transaction = tid
+        WHERE ccct.id = ccct_id;
+      ELSE
+        UPDATE Blockchain.CombinedCollapseChainTransaction ccct
+        SET end_user_transaction = tid
+        WHERE ccct.id = ccct_id;
+      END IF;
+      INSERT INTO Blockchain.Pool VALUES (tid);
     END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
---
+
 -- CREATE OR REPLACE FUNCTION Blockchain.AddPairCalcelTransaction(
 --   invoker TEXT,
 --   other TEXT,

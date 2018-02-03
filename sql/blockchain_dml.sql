@@ -8,3 +8,4 @@ INSERT INTO Blockchain.Block(curr_hash, prev_hash)
 SELECT Blockchain.AddUser('a');
 SELECT Blockchain.AddUser('b');
 select Blockchain.addGiveCookieTransaction('a',1517649799,'b','00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',12,'love','abc');
+select Blockchain.addReceiveCookieTransaction('b',1517649799,'a','00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',12,'love cookies','abc');

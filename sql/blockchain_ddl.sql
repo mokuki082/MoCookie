@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
 
   Constraints:
     ccct_num_cookies_check: Number of cookies cannot be 0 or negative.
+    ccct_user_check: All three users are different.
   Trigger:
     ccct_protocol_check: Ensure all transactions are mutually exclusive.
   */
@@ -124,7 +125,10 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
     ON DELETE CASCADE ON UPDATE CASCADE,
   num_cookies INT NOT NULL,
   -- Constraints
-  CONSTRAINT ccct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT ccct_num_cookies_check CHECK (num_cookies > 0),
+  CONSTRAINT ccct_user_check CHECK (start_user != mid_user AND
+                                    mid_user != end_user AND
+                                    start_user != end_user)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.PairCancelTransaction (
@@ -151,6 +155,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
 
   Constraints:
     cpct_num_cookies_check: Number of cookies cannot be 0 or negative.
+    cpct_user_check: User a and b are different
   Trigger:
     cpct_protocol_check: Ensure all transactions are mutually exclusive.
   */
@@ -164,7 +169,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
     ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   num_cookies INT NOT NULL,
   -- Constraints
-  CONSTRAINT cpct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT cpct_num_cookies_check CHECK (num_cookies > 0),
+  CONSTRAINT cpct_user_check CHECK (user_a != user_b)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.AddUserTransaction (
