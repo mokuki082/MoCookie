@@ -2,26 +2,49 @@ DROP SCHEMA Blockchain CASCADE;
 CREATE SCHEMA IF NOT EXISTS Blockchain;
 
 CREATE TABLE IF NOT EXISTS Blockchain.CookieUser (
+  /* Represents a user in the system.*/
   pubk TEXT PRIMARY KEY,
   valid BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Transaction (
-  id SERIAL PRIMARY KEY
+  /* Generic transaction class.
+
+  Constraints:
+    transaction_protocol_check -- Check that protocol is recognized
+  */
+  id SERIAL PRIMARY KEY,
+  protocol VARCHAR(5) NOT NULL,
+  CONSTRAINT transaction_protocol_check CHECK (protocol IN
+    ('gct', 'rct', 'cct', 'ccct', 'pct', 'cpct', 'aut', 'rut'))
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Block (
-  curr_hash TEXT PRIMARY KEY,
-  prev_hash TEXT NOT NULL, -- TODO: Use trigger to make sure it's either genesis or references previous blocks
-  ordering SERIAL UNIQUE NOT NULL
+  /* Represents a block in the blockchain.
+
+  Triggers:
+    block_prev_hash_fkey -- Check that prev_hash is either all 0s or references
+      the previous curr_hash.
+  */
+  id SERIAL PRIMARY KEY,
+  curr_hash TEXT UNIQUE,
+  prev_hash TEXT NOT NULL  -- block_prev_hash_fkey trigger
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
+  /* Represents a gc transaction
+
+  Constraints:
+    gct_invoker_ttime_key: Ensure no duplicated transaction.
+    gct_num_cookies_check: Number of cookies cannot be 0 or negative.
+  Trigger:
+    gct_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
   receiver TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
-  recent_hash TEXT REFERENCES Blockchain.Block(curr_hash) NOT NULL,
+  recent_block INT REFERENCES Blockchain.Block(id) NOT NULL,
   num_cookies INT NOT NULL,
   reason VARCHAR(100),
   signature TEXT NOT NULL,
@@ -32,6 +55,14 @@ CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
+  /* Represents a rc transaction
+
+  Constraints:
+    rct_invoker_ttime_key: Ensure no duplicated transaction.
+    rct_num_cookies_check: Number of cookies cannot be 0 or negative.
+  Trigger:
+    rct_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
@@ -47,6 +78,13 @@ CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
+  /* Represents a cc transaction
+
+  Constraints:
+    cct_invoker_ttime_key: Ensure no duplicated transaction.
+  Trigger:
+    cct_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   transaction_time TIMESTAMP NOT NULL,
@@ -57,6 +95,13 @@ CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
+  /* Represents a ccc transaction
+
+  Constraints:
+    ccct_num_cookies_check: Number of cookies cannot be 0 or negative.
+  Trigger:
+    ccct_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   start_user TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   mid_user TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
@@ -70,12 +115,30 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.PairCancelTransaction (
+  /* Represents a pc transaction
+
+  Constraints:
+    pct_invoker_ttime_key: Ensure no duplicated transaction.
+  Trigger:
+    pct_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
+  invoker TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
+  transaction_time TIMESTAMP NOT NULL,
   recent_hash TEXT REFERENCES Blockchain.Block(curr_hash) NOT NULL,
-  signature TEXT NOT NULL
+  signature TEXT NOT NULL,
+  -- Constraints
+  CONSTRAINT pct_invoker_ttime_key UNIQUE(invoker, transaction_time)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
+  /* Represents a cpc transaction
+
+  Constraints:
+    cpct_num_cookies_check: Number of cookies cannot be 0 or negative.
+  Trigger:
+    cpct_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   user_a_id INT REFERENCES Blockchain.PairCancelTransaction(id),
   user_b_id INT REFERENCES Blockchain.PairCancelTransaction(id),
@@ -83,35 +146,53 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
   user_b TEXT REFERENCES Blockchain.CookieUser(pubk) NOT NULL,
   num_cookies INT NOT NULL,
   -- Constraints
-  CONSTRAINT ccct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT cpct_num_cookies_check CHECK (num_cookies > 0)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.AddUserTransaction (
+  /* Represents a au transaction.
+
+  Trigger:
+    aut_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   join_time TIMESTAMP NOT NULL,
   user_pubk TEXT REFERENCES Blockchain.CookieUser(pubk) UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.RemoveUserTransaction (
+  /* Represents a ru transaction.
+
+  Trigger:
+    rut_protocol_check: Ensure all transactions are mutually exclusive.
+  */
   id INT REFERENCES Blockchain.Transaction(id) PRIMARY KEY,
   remove_time TIMESTAMP NOT NULL,
   user_pubk TEXT REFERENCES Blockchain.CookieUser(pubk) UNIQUE NOT NULL
 );
 
-
 CREATE TABLE IF NOT EXISTS Blockchain.IncludeTransaction (
+  /* Shows the transactions in a block. */
   block TEXT REFERENCES Blockchain.Block(curr_hash),
   transaction_id INT REFERENCES Blockchain.Transaction(id),
   PRIMARY KEY(block, transaction_id)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Pool (
+  /* Shows the transactions that are currently in the pool. */
   transaction_id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Debt (
-  sender_pubk TEXT,
-  receiver_pubk TEXT,
+  /* Shows the debt between two users
+
+  Constraint:
+    debt_cookies_owed_check -- cookies_owed cannot be negative.
+  */
+  sender_pubk TEXT REFERENCES Blockchain.CookieUser(pubk),
+  receiver_pubk TEXT REFERENCES Blockchain.CookieUser(pubk),
   cookies_owed INT DEFAULT 0 NOT NULL,
   PRIMARY KEY(sender_pubk, receiver_pubk)
+  -- Constraints:
+  CONSTRAINT debt_cookies_owed_check CHECK (cookies_owed >= 0)
 );
