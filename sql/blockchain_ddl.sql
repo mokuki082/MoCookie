@@ -161,8 +161,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
   */
   id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
-  user_a_id INT REFERENCES Blockchain.PairCancelTransaction(id),
-  user_b_id INT REFERENCES Blockchain.PairCancelTransaction(id),
+  user_a_transaction INT REFERENCES Blockchain.PairCancelTransaction(id),
+  user_b_transaction INT REFERENCES Blockchain.PairCancelTransaction(id),
   user_a TEXT REFERENCES Blockchain.ValidUser(pubk)
     ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   user_b TEXT REFERENCES Blockchain.ValidUser(pubk)
@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.RemoveUserTransaction (
 
 CREATE TABLE IF NOT EXISTS Blockchain.IncludeTransaction (
   /* Shows the transactions in a block. */
-  block TEXT REFERENCES Blockchain.Block(curr_hash),
+  block INT REFERENCES Blockchain.Block(id),
   transaction_id INT REFERENCES Blockchain.Transaction(id),
   PRIMARY KEY(block, transaction_id)
 );
