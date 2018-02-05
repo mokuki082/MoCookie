@@ -1,5 +1,16 @@
 CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   RETURNS INT AS
+  /* Create a generic transaction
+
+  Returns:
+  The transaction_id of the newly created transaction.
+
+  Arguments:
+  protocol -- a 3-4 character protocol
+
+  Exception:
+  transaction_protocol_check
+  */
   $$
   BEGIN
   INSERT INTO Blockchain.Transaction(protocol) VALUES (protocol);
@@ -9,18 +20,37 @@ CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addUser(pubk TEXT)
+CREATE OR REPLACE FUNCTION Blockchain.addUser(new_pubk TEXT)
   RETURNS VOID AS
+  /* Add a user into the database, then add a debt record for this user
+  and every other users.
+  */
   $$
+  DECLARE
+    other_pubk TEXT;
   BEGIN
-    INSERT INTO Blockchain.ValidUser(pubk) VALUES (pubk);
+    -- Create User
+    INSERT INTO Blockchain.ValidUser(pubk) VALUES (new_pubk);
+    -- Create debts
+    FOR other_pubk IN SELECT vu.pubk
+                      FROM Blockchain.ValidUser vu
+                      WHERE vu.pubk != new_pubk LOOP
+      INSERT INTO Blockchain.Debt(sender_pubk, receiver_pubk, cookies_owed)
+        VALUES (other_pubk, new_pubk, 0);
+      INSERT INTO Blockchain.Debt(sender_pubk, receiver_pubk, cookies_owed)
+        VALUES (new_pubk, other_pubk, 0);
+    END LOOP;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION Blockchain.removeUser(pubk TEXT)
   RETURNS VOID AS
+  /* Remove a user from the database.
+  */
   $$
   BEGIN
+    -- Delete the user from ValidUser
+    -- Trigger will automatically add them into InvalidUser
     DELETE FROM Blockchain.ValidUser vu WHERE vu.pubk = pubk;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
@@ -319,6 +349,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeCCCT(id INT)
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
+
 CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
   new_hash TEXT,
   prev_hash TEXT)
@@ -327,7 +358,7 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
   DECLARE
     bid INT;
     protocol VARCHAR(4);
-    tid RECORD;
+    tid INT;
   BEGIN
     -- Create a new block
     INSERT INTO Blockchain.Block(curr_hash, prev_hash)

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION Blockchain.checkPreviousHashFKey()
+CREATE OR REPLACE FUNCTION Blockchain.blockPrevHashFkey()
   RETURNS trigger AS
   /* Check that the previous_hash is valid. */
   $$
@@ -6,17 +6,24 @@ CREATE OR REPLACE FUNCTION Blockchain.checkPreviousHashFKey()
       genesis_hash CONSTANT TEXT := '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
       searched_hash TEXT;
     BEGIN
-      IF (NEW.id = 1 AND NEW.prev_hash IS NULL) THEN
-        -- Genesis block must have a all 0 prev_hash
-        RETURN NEW;
-      searched_hash := (SELECT curr_hash FROM Blockchain.Block
-                        WHERE NEW.id - 1 = id);
-      ELSEIF (searched_hash IS NOT NULL AND
-              NEW.prev_hash = searched_hash) THEN
-        -- Non-genesis block must have previuos block's hash as prev_hash
-        RETURN NEW;
+      IF (NEW.id = 1) THEN
+        IF (NEW.prev_hash IS NULL AND NEW.curr_hash = genesis_hash) THEN
+          -- Genesis block must have a all 0 curr_hash and NULL prev_hash
+          RETURN NEW;
+        ELSE
+          RAISE EXCEPTION 'Genesis block must have NULL prev_hash and all 0 curr_hash.';
+        END IF;
+      ELSEIF (NEW.id > 1) THEN
+        IF (NEW.prev_hash IS NOT NULL AND
+            NEW.prev_hash = (SELECT curr_hash FROM Blockchain.Block
+                             WHERE id = NEW.id - 1)) THEN
+          -- Non-genesis block must have previous block's hash as prev_hash
+          RETURN NEW;
+        ELSE
+          RAISE EXCEPTION 'Block''s prev_hash does not match.';
+        END IF;
       ELSE
-        RAISE EXCEPTION 'Invalid prev_hash.';
+        RAISE EXCEPTION 'Block id cannot be 0 or negative.';
       END IF;
     END
   $$ LANGUAGE plpgsql;
@@ -26,10 +33,10 @@ CREATE TRIGGER block_prev_hash_fkey
   /* Check that the previous_hash is valid. */
   BEFORE INSERT OR UPDATE OF curr_hash, prev_hash ON Blockchain.Block
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkPreviousHashFKey();
+  EXECUTE PROCEDURE Blockchain.blockPrevHashFkey();
 
 
-CREATE OR REPLACE FUNCTION Blockchain.checkTransactionMutualExcl()
+CREATE OR REPLACE FUNCTION Blockchain.transactionMutualExclCheck()
   RETURNS trigger AS
   /* Check that all transaction subclasses are mutually exclusive. */
   $$
@@ -90,7 +97,7 @@ CREATE TRIGGER gct_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.GiveCookieTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS rct_mutualexcl_check
   ON Blockchain.ReceiveCookieTransaction;
@@ -98,7 +105,7 @@ CREATE TRIGGER rct_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.ReceiveCookieTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS cct_mutualexcl_check
   ON Blockchain.ChainCollapseTransaction;
@@ -106,7 +113,7 @@ CREATE TRIGGER cct_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.ChainCollapseTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS ccct_mutualexcl_check
   ON Blockchain.CombinedChainCollapseTransaction;
@@ -114,7 +121,7 @@ CREATE TRIGGER ccct_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.CombinedChainCollapseTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS pct_mutualexcl_check
   ON Blockchain.PairCancelTransaction;
@@ -122,7 +129,7 @@ CREATE TRIGGER pct_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.PairCancelTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS cpct_mutualexcl_check
   ON Blockchain.CombinedPairCancelTransaction;
@@ -130,7 +137,7 @@ CREATE TRIGGER cpct_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.CombinedPairCancelTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS aut_mutualexcl_check
   ON Blockchain.AddUserTransaction;
@@ -138,7 +145,7 @@ CREATE TRIGGER aut_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.AddUserTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
 DROP TRIGGER IF EXISTS rut_mutualexcl_check
   ON Blockchain.RemoveUserTransaction;
@@ -146,21 +153,168 @@ CREATE TRIGGER rut_mutualexcl_check
   /* Check that transactions are mutually exclusive. */
   AFTER INSERT OR UPDATE OF id ON Blockchain.RemoveUserTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.checkTransactionMutualExcl();
+  EXECUTE PROCEDURE Blockchain.transactionMutualExclCheck();
 
-CREATE OR REPLACE FUNCTION Blockchain.addToInvalidUser()
-  RETURNS trigger AS
-  /* Insert user into InvalidUser upon deletion */
+
+CREATE OR REPLACE FUNCTION Blockchain.isValidUser(k TEXT)
+  RETURNS BOOLEAN AS
+  /* Returns whether user is valid or not
+
+  Argument:
+  k -- User's public key
+
+  Returns:
+  TRUE -- User is valid
+  FALSE -- User is invalid
+  */
   $$
   BEGIN
-    INSERT INTO Blockchain.InvalidUser(pubk) VALUES (OLD.pubk);
+    RETURN (SELECT valid FROM CookieUser WHERE pubk = k);
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS validuser_pubk_trig
-  ON Blockchain.ValidUser;
-CREATE TRIGGER validuser_pubk_trig
-  /* Insert user into InvalidUser upon deletion */
-  AFTER DELETE ON Blockchain.ValidUser
+CREATE OR REPLACE FUNCTION Blockchain.GCTUserCheck()
+  RETURNS trigger AS
+  /* Check that all users are valid */
+  $$
+  BEGIN
+    IF ((SELECT Blockchain.isValidUser(NEW.invoker)) AND
+        (SELECT Blockchain.isValidUser(NEW.receiver))) THEN
+      RETURN NEW;
+    ELSE RAISE EXCEPTION 'User is invalid.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS gct_user_check ON Blockchain.GiveCookieTransaction;
+CREATE TRIGGER gct_user_check
+  /* Check that all users are valid */
+  BEFORE INSERT OR UPDATE OF invoker, receiver
+    ON Blockchain.GiveCookieTransaction
   FOR EACH ROW
-  EXECUTE PROCEDURE Blockchain.addToInvalidUser();
+  EXECUTE PROCEDURE Blockchain.GCTUserCheck();
+
+CREATE OR REPLACE FUNCTION Blockchain.RCTUserCheck()
+  RETURNS trigger AS
+  /* Check that all users are valid */
+  $$
+  BEGIN
+    IF ((SELECT Blockchain.isValidUser(NEW.invoker)) AND
+        (SELECT Blockchain.isValidUser(NEW.sender))) THEN
+      RETURN NEW;
+    ELSE RAISE EXCEPTION 'User is invalid.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS rct_user_check ON Blockchain.ReceiveCookieTransaction;
+CREATE TRIGGER rct_user_check
+  /* Check that all users are valid */
+  BEFORE INSERT OR UPDATE OF invoker, sender
+    ON Blockchain.ReceiveCookieTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.RCTUserCheck();
+
+CREATE OR REPLACE FUNCTION Blockchain.CCTUserCheck()
+  RETURNS trigger AS
+  /* Check that all users are valid */
+  $$
+  BEGIN
+    IF ((SELECT Blockchain.isValidUser(NEW.invoker))) THEN
+      RETURN NEW;
+    ELSE RAISE EXCEPTION 'User is invalid.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS cct_user_check ON Blockchain.ChainCollapseTransaction;
+CREATE TRIGGER block_prev_hash_fkey
+  /* Check that all users are valid */
+  BEFORE INSERT OR UPDATE OF invoker ON Blockchain.ChainCollapseTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.CCTUserCheck();
+
+CREATE OR REPLACE FUNCTION Blockchain.CCCTUserCheck()
+  RETURNS trigger AS
+  /* Check that all users are valid */
+  $$
+  BEGIN
+    IF ((SELECT Blockchain.isValidUser(NEW.start_user)) AND
+        (SELECT Blockchain.isValidUser(NEW.mid_user)) AND
+        (SELECT Blockchain.isValidUser(NEW.end_user))) THEN
+      RETURN NEW;
+    ELSE RAISE EXCEPTION 'User is invalid.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS ccct_user_check
+  ON Blockchain.CombinedChainCollapseTransaction;
+CREATE TRIGGER ccct_user_check
+  /* Check that the previous_hash is valid. */
+  BEFORE INSERT OR UPDATE OF start_user, mid_user, end_user
+    ON Blockchain.CombinedChainCollapseTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.CCCTUserCheck();
+
+CREATE OR REPLACE FUNCTION Blockchain.PCTUserCheck()
+  RETURNS trigger AS
+  /* Check that all users are valid */
+  $$
+  BEGIN
+    IF ((SELECT Blockchain.isValidUser(NEW.invoker))) THEN
+      RETURN NEW;
+    ELSE RAISE EXCEPTION 'User is invalid.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS pct_user_check ON Blockchain.PairCancelTransaction;
+CREATE TRIGGER pct_user_check
+  /* Check that all users are valid */
+  BEFORE INSERT OR UPDATE OF invoker ON Blockchain.PairCancelTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.PCTUserCheck();
+
+CREATE OR REPLACE FUNCTION Blockchain.CPCTUserCheck()
+  RETURNS trigger AS
+  /* Check that all users are valid */
+  $$
+  BEGIN
+    IF ((SELECT Blockchain.isValidUser(NEW.user_a)) AND
+        (SELECT Blockchain.isValidUser(NEW.user_b))) THEN
+      RETURN NEW;
+    ELSE RAISE EXCEPTION 'User is invalid.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS cpct_user_check
+  ON Blockchain.CombiendPairCancelTransaction;
+CREATE TRIGGER cpct_user_check
+  /* Check that all users are valid */
+  BEFORE INSERT OR UPDATE OF user_a, user_b
+    ON Blockchain.CombinedPairCancelTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.CPCTUsercheck();
+
+CREATE OR REPLACE FUNCTION Blockchain.cookieUserValidCheck()
+  RETURNS trigger AS
+  /* Once a user is invalid they cannot be valid again */
+  $$
+  BEGIN
+    IF (NOT OLD.valid AND NEW.valid) THEN
+      -- If the user is changed from invalid -> valid
+      RAISE EXCEPTION 'User cannot be changed to valid';
+    ELSE
+      RETURN NEW;
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS cookieuser_valid_check ON Blockchain.CookieUser;
+CREATE TRIGGER cookieuser_valid_check
+  /* Once a user is invalid they cannot be valid again */
+  BEFORE UPDATE OF valid ON Blockchain.CookieUser
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.cookieUserValidCheck();
