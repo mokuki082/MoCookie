@@ -484,3 +484,26 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+
+CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(hash TEXT)
+  RETURNS TABLE (block_hash TEXT,
+                 transaction_id INT,
+                 transaction_protocol VARCHAR(4)) AS
+  /* Return all transaction ids and protocols up to "hash"
+
+  Arguments:
+  hash: Return blockchain information up to this hash
+
+  Returns:
+  A table containing (block_hash, transaction_id, transaction_protocol)
+  */
+  $$
+  SELECT curr_hash, t.id, protocol
+  FROM Blockchain.IncludeTransaction it
+      JOIN Blockchain.Block b ON (block = b.id)
+      JOIN Blockchain.Transaction t ON (transaction_id = t.id)
+  WHERE b.id > (SELECT b2.id
+                FROM Blockchain.Block b2
+                WHERE b2.curr_hash = hash)
+  $$ LANGUAGE sql SECURITY INVOKER;

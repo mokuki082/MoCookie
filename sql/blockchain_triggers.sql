@@ -320,4 +320,84 @@ CREATE TRIGGER cookieuser_valid_check
   EXECUTE PROCEDURE Blockchain.cookieUserValidCheck();
 
 
--- TODO: Make sure candidates in Combined transaction are the ones in the actual sub-transactions.
+CREATE OR REPLACE FUNCTION Blockchain.CCCTIndividualTransactionCheck()
+  RETURNS trigger AS
+  /* Make sure candidates in Combined transaction are the ones in the actual
+  sub-transactions.
+  */
+  $$
+  BEGIN
+    IF (NEW.start_user_transaction IS NOT NULL) THEN
+      IF (NOT NEW.start_user = (SELECT invoker
+                                FROM Blockchain.ChainCollapseTransaction
+                                WHERE id = NEW.start_user_transaction)) THEN
+        RAISE EXCEPTION 'Incorrect start_user.';
+      END IF;
+    END IF;
+    IF (NEW.mid_user_transaction IS NOT NULL) THEN
+      IF (NOT NEW.mid_user = (SELECT invoker
+                              FROM Blockchain.ChainCollapseTransaction
+                              WHERE id = NEW.mid_user_transaction)) THEN
+        RAISE EXCEPTION 'Incorrect mid_user.';
+      END IF;
+    END IF;
+    IF (NEW.end_user_transaction IS NOT NULL) THEN
+      IF (NOT NEW.end_user = (SELECT invoker
+                              FROM Blockchain.ChainCollapseTransaction
+                              WHERE id = NEW.end_user_transaction)) THEN
+        RAISE EXCEPTION 'Incorrect end_user.';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+DROP TRIGGER IF EXISTS ccct_individual_transaction_check
+  ON Blockchain.CombinedChainCollapseTransaction;
+CREATE TRIGGER ccct_individual_transaction_check
+  /* Make sure candidates in Combined transaction are the ones in the actual
+  sub-transactions.
+  */
+  BEFORE UPDATE OF start_user_transaction,
+                   mid_user_transaction,
+                   end_user_transaction
+                   ON Blockchain.CombinedChainCollapseTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.CCCTIndividualTransactionCheck();
+
+
+CREATE OR REPLACE FUNCTION Blockchain.CPCTIndividualTransactionCheck()
+  RETURNS trigger AS
+  /* Make sure candidates in Combined transaction are the ones in the actual
+  sub-transactions.
+  */
+  $$
+  BEGIN
+    IF (NEW.user_a_transaction IS NOT NULL) THEN
+      IF (NOT NEW.user_a = (SELECT invoker
+                            FROM Blockchain.PairCancelTransaction
+                            WHERE id = NEW.user_a_transaction)) THEN
+        RAISE EXCEPTION 'Incorrect user A.';
+      END IF;
+    END IF;
+    IF (NEW.user_b_transaction IS NOT NULL) THEN
+      IF (NOT NEW.user_b = (SELECT invoker
+                            FROM Blockchain.PairCancelTransaction
+                            WHERE id = NEW.user_b_transaction)) THEN
+        RAISE EXCEPTION 'Incorrect user B.';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+DROP TRIGGER IF EXISTS cpct_individual_transaction_check
+  ON Blockchain.CombinedPairCancelTransaction;
+CREATE TRIGGER cpct_individual_transaction_check
+  /* Make sure candidates in Combined transaction are the ones in the actual
+  sub-transactions.
+  */
+  BEFORE UPDATE OF user_a_transaction, user_b_transaction
+                   ON Blockchain.CombinedPairCancelTransaction
+  FOR EACH ROW
+  EXECUTE PROCEDURE Blockchain.CPCTIndividualTransactionCheck();

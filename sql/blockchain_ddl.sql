@@ -170,10 +170,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (
     ON DELETE CASCADE ON UPDATE CASCADE,
   user_a_transaction INT REFERENCES Blockchain.PairCancelTransaction(id),
   user_b_transaction INT REFERENCES Blockchain.PairCancelTransaction(id),
-  user_a TEXT REFERENCES Blockchain.CookieUser(pubk)
-    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
-  user_b TEXT REFERENCES Blockchain.CookieUser(pubk)
-    ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+  user_a TEXT REFERENCES Blockchain.CookieUser(pubk),
+  user_b TEXT REFERENCES Blockchain.CookieUser(pubk),
   num_cookies INT NOT NULL,
   -- Constraints
   CONSTRAINT cpct_num_cookies_check CHECK (num_cookies > 0),
@@ -215,7 +213,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.Pool (
   /* Shows the transactions that are currently in the pool. */
   transaction_id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
-  insertion_time TIMESTAMP NOT NULL DEFAULT NOW()
+  insert_time TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Debt (
