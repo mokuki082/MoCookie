@@ -69,14 +69,14 @@ CREATE OR REPLACE FUNCTION Blockchain.addGiveCookieTransaction(
     DECLARE
       tid INT;
       bid INT;
-      ttime TIMESTAMP;
+      ttime TIMESTAMPTZ;
     BEGIN
       -- Create a generic transaction
       tid := Blockchain.CreateTransaction('gct');
       -- Obtain block_id
       bid := (SELECT id FROM Blockchain.Block
               WHERE curr_hash = recent_hash);
-      -- Convert unix time into timestamp format
+      -- Convert unix time into TIMESTAMPTZ format
       ttime := to_timestamp(transaction_time);
       -- Create GiveCookieTransaction
       INSERT INTO Blockchain.GiveCookieTransaction(
@@ -102,14 +102,14 @@ CREATE OR REPLACE FUNCTION Blockchain.addReceiveCookieTransaction(
   DECLARE
     tid INT;
     bid INT;
-    ttime TIMESTAMP;
+    ttime TIMESTAMPTZ;
   BEGIN
     -- Create a generic transaction
     tid := Blockchain.CreateTransaction('rct');
     -- Obtain block_id
     bid := (SELECT id FROM Blockchain.Block
             WHERE curr_hash = recent_hash);
-    -- Convert unix time into timestamp format
+    -- Convert unix time into TIMESTAMPTZ format
     ttime := to_timestamp(transaction_time);
     -- Create GiveCookieTransaction
     INSERT INTO Blockchain.ReceiveCookieTransaction(
@@ -136,7 +136,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addCollapseChainTransaction(
     DECLARE
       tid INT;
       bid INT;
-      ttime TIMESTAMP;
+      ttime TIMESTAMPTZ;
       ccct_id INT;
     BEGIN
       -- Create a generic transaction
@@ -144,7 +144,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addCollapseChainTransaction(
       -- Obtain block_id
       bid := (SELECT id FROM Blockchain.Block
               WHERE curr_hash = recent_hash);
-      -- Obtain ttime in timestamp format
+      -- Obtain ttime in TIMESTAMPTZ format
       ttime := to_timestamp(transaction_time);
       -- Create CollapseChainTransaction
       INSERT INTO Blockchain.CombinedCollapseChainTransaction(
@@ -199,7 +199,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
   DECLARE
     tid INT;
     bid INT;
-    ttime TIMESTAMP;
+    ttime TIMESTAMPTZ;
     cpct_id INT;
   BEGIN
     -- Create a generic transaction
@@ -207,7 +207,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
     -- Obtain block_id
     bid := (SELECT id FROM Blockchain.Block
             WHERE curr_hash = recent_hash);
-    -- Obtain ttime in timestamp format
+    -- Obtain ttime in TIMESTAMPTZ format
     ttime := to_timestamp(transaction_time);
     cpct_id := (SELECT id
              FROM Blockchain.CombinedPairCancelTransaction cpct
@@ -432,10 +432,12 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
   prev_hash TEXT)
   RETURNS VOID AS
   $$
+  /* Commit every transaction in the pool
+  */
   DECLARE
     bid INT;
     protocol VARCHAR(4);
-    insert_time TIMESTAMP;
+    insert_time TIMESTAMPTZ;
     tid INT;
     timeout INTERVAL := INTERVAL '12 hours';
   BEGIN
@@ -506,4 +508,26 @@ CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(hash TEXT)
   WHERE b.id > (SELECT b2.id
                 FROM Blockchain.Block b2
                 WHERE b2.curr_hash = hash)
+  $$ LANGUAGE sql SECURITY INVOKER;
+
+
+CREATE OR REPLACE FUNCTION Blockchain.getGCT(param_id INT)
+  RETURNS TABLE (invoker TEXT,
+                 ttime DOUBLE PRECISION,
+                 receiver TEXT,
+                 recent_block_hash TEXT,
+                 num_cookies INT,
+                 reason VARCHAR(100),
+                 signature TEXT) AS
+  /* get all information associated to a GCT.
+
+  Returns:
+  A table containing GCT related information
+  */
+  $$
+  SELECT invoker, extract(epoch FROM transaction_time) as ttime,
+         receiver, b.curr_hash, num_cookies, reason, signature
+  FROM Blockchain.GiveCookieTransaction gct
+    JOIN Blockchain.Block b ON (gct.recent_block = b.id)
+  WHERE gct.id = param_id
   $$ LANGUAGE sql SECURITY INVOKER;
