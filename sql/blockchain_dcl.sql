@@ -20,38 +20,39 @@ CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addUser(new_pubk TEXT)
+CREATE OR REPLACE FUNCTION Blockchain.addAddUserTransaction(new_pubk TEXT)
   RETURNS VOID AS
-  /* Add a user into the database, then add a debt record for this user
-  and every other users.
+  /* Add a AddUserTransaction and put it into the pool.
+
+  Arguments:
+  new_pubk: public key of the user.
   */
   $$
   DECLARE
-    other_pubk TEXT;
+    tid INT;
   BEGIN
-    -- Create User
-    INSERT INTO Blockchain.ValidUser(pubk) VALUES (new_pubk);
-    -- Create debts
-    FOR other_pubk IN SELECT vu.pubk
-                      FROM Blockchain.ValidUser vu
-                      WHERE vu.pubk != new_pubk LOOP
-      INSERT INTO Blockchain.Debt(sender_pubk, receiver_pubk, cookies_owed)
-        VALUES (other_pubk, new_pubk, 0);
-      INSERT INTO Blockchain.Debt(sender_pubk, receiver_pubk, cookies_owed)
-        VALUES (new_pubk, other_pubk, 0);
-    END LOOP;
+    tid := Blockchain.createTransaction('aut');
+    INSERT INTO Blockchain.AddUserTransaction(id, join_time, user_pubk)
+      VALUES (tid, NOW(), new_pubk);
+    INSERT INTO Blockchain.Pool(transaction_id) VALUES (tid);
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
-CREATE OR REPLACE FUNCTION Blockchain.removeUser(pubk TEXT)
+CREATE OR REPLACE FUNCTION Blockchain.addRemoveUserTransaction(user_pubk TEXT)
   RETURNS VOID AS
-  /* Remove a user from the database.
+  /* Add a RemoveUserTransaction and put it into the pool.
+
+  Arguments:
+  user_pubk: public key of the user.
   */
   $$
+  DECLARE
+    tid INT;
   BEGIN
-    -- Delete the user from ValidUser
-    -- Trigger will automatically add them into InvalidUser
-    DELETE FROM Blockchain.ValidUser vu WHERE vu.pubk = pubk;
+    tid := Blockchain.createTransaction('rut');
+    INSERT INTO Blockchain.RemoveUserTransaction(id, remove_time, user_pubk)
+      VALUES (tid, NOW(), user_pubk);
+    INSERT INTO Blockchain.Pool(transaction_id) VALUES (tid);
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
@@ -240,18 +241,13 @@ CREATE OR REPLACE FUNCTION Blockchain.executeGCT(id INT)
     receiver TEXT;
     num_cookies INT;
   BEGIN
-    invoker := (SELECT invoker
-                FROM Blockchain.GiveCookieTransaction gct
-                WHERE gct.id = id);
-    receiver := (SELECT receiver
-                 FROM Blockchain.GiveCookieTransaction gct
-                 WHERE gct.id = id);
-    num_cookies := (SELECT num_cookies
-                    FROM Blockchain.GiveCookieTransaction gct
-                    WHERE gct.id = id);
+    SELECT gct.invoker, gct.receiver, gct.num_cookies
+      INTO invoker, receiver, num_cookies
+      FROM Blockchain.GiveCookieTransaction gct
+     WHERE gct.id = id;
     UPDATE Blockchain.Debt
-    SET cookies_owed = cookies_owed + num_cookies
-    WHERE sender_pubk = invoker AND receiver_pubk = receiver;
+       SET cookies_owed = cookies_owed + num_cookies
+     WHERE sender_pubk = invoker AND receiver_pubk = receiver;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
@@ -263,15 +259,10 @@ CREATE OR REPLACE FUNCTION Blockchain.executeRCT(id INT)
     sender TEXT;
     num_cookies INT;
   BEGIN
-    invoker := (SELECT rct.invoker
-                FROM Blockchain.ReceiveCookieTransaction rct
-                WHERE rct.id = id);
-    sender := (SELECT rct.sender
-                 FROM Blockchain.RceiveCookieTransaction rct
-                 WHERE rct.id = id);
-    num_cookies := (SELECT rct.num_cookies
-                    FROM Blockchain.RceiveCookieTransaction rct
-                    WHERE rct.id = id);
+    SELECT rct.invoker, rct.sender, rct.num_cookies
+      INTO invoker, sender, num_cookies
+      FROM Blockchain.ReceiveCookieTransaction rct
+     WHERE rct.id = id;
     IF (num_cookies <= (SELECT cookies_owed
                         FROM Blockchain.Debt
                         WHERE sender_pubk = sender AND
@@ -296,25 +287,16 @@ CREATE OR REPLACE FUNCTION Blockchain.executeCCCT(id INT)
   BEGIN
     -- Check if all three candidates have signed the contract
     IF ((SELECT True
-         FROM Blockchain.CombinedChainCollapseTransaction ccct
-         WHERE ccct.id = id AND
+           FROM Blockchain.CombinedChainCollapseTransaction ccct
+          WHERE ccct.id = id AND
                start_user_transaction IS NOT NULL AND
                mid_user_transaction IS NOT NULL AND
                end_user_transaction IS NOT NULL)) THEN
-      -- Obtain user information
-      start_user := (SELECT ccct.start_user
-                     FROM Blockchain.CombinedChainCollapseTransaction ccct
-                     WHERE ccct.id = id);
-      mid_user := (SELECT ccct.mid_user
-                   FROM Blockchain.CombinedChainCollapseTransaction ccct
-                   WHERE ccct.id = id);
-      end_user := (SELECT ccct.end_user
-                   FROM Blockchain.CombinedChainCollapseTransaction ccct
-                   WHERE ccct.id = id);
-      -- Obtain number of cookies they wish to collapse
-      num_cookies := (SELECT ccct.num_cookies
-                      FROM Blockchain.CombinedChainCollapseTransaction ccct
-                      WHERE cccct.id = id);
+      -- Obtain transaction information
+      SELECT ccct.start_user, ccct.mid_user, ccct.end_user, ccct.num_cookies
+        INTO start_user, mid_user, end_user, num_cookies
+        FROM Blockchain.CombinedChainCollapseTransaction ccct
+       WHERE ccct.id = id;
       -- Check that A owes B (and B owes C) enough cookies
       IF (SELECT d1.num_cookies >= num_cookies AND
                  d2.num_cookies >= num_cookies
@@ -349,6 +331,101 @@ CREATE OR REPLACE FUNCTION Blockchain.executeCCCT(id INT)
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
+CREATE OR REPLACE FUNCTION Blockchain.executeCPCT(id INT)
+  RETURNS VOID AS
+  $$
+  DECLARE
+    user_a TEXT;
+    user_b TEXT;
+    num_cookies INT;
+  BEGIN
+    -- Check if both candidates have signed the contract
+    IF ((SELECT True
+         FROM Blockchain.CombinedPairCancelTransaction cpct
+         WHERE cpct.id = id AND
+               user_a_transaction IS NOT NULL AND
+               user_b_transaction IS NOT NULL)) THEN
+      -- Obtain transaction information
+      SELECT cpct.user_a, cpct.user_b, cpct.num_cookies
+      INTO user_a, user_b, num_cookies
+      FROM Blockchain.CombinedPairCancelTransaction cpct
+      WHERE cpct.id = id;
+      -- Check that A owes B (and B owes A) enough cookies
+      IF (SELECT d1.num_cookies >= num_cookies AND
+                 d2.num_cookies >= num_cookies
+          FROM Blockchain.Debt d1 JOIN Blockchain.Debt d2 ON
+               (d1.sender_pubk = d2.sender_pubk AND
+                d1.receiver_pubk = d2.receiver_pubk)
+          WHERE d1.sender_pubk = user_a AND
+                d1.receiver_pubk = user_b AND
+                d2.sender_pubk = user_b AND
+                d2.receiver_pubk = user_a) THEN
+        -- Decrement the number of cookies A owes B
+        UPDATE Blockchain.Debt d
+        SET d.num_cookies = d.num_cookies - num_cookies
+        WHERE d.sender_pubk = user_a AND
+              d.receiver_pubk = user_b;
+        -- Decrement the number of cookies B owes C
+        UPDATE Blockchain.Debt d
+        SET d.num_cookies = d.num_cookies - num_cookies
+        WHERE d.sender_pubk = user_b AND
+              d.receiver_pubk = user_a;
+      ELSE
+        RAISE EXCEPTION 'User(s) does not have enough debt.';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'Transaction incomplete.';
+    END IF;
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.executeAUT(id INT)
+  RETURNS VOID AS
+  /* Add a user into the database, then add a debt record for this user
+  and every other users.
+
+  Arguments:
+  new_pubk: public key of the user.
+  */
+  $$
+  DECLARE
+    new_pubk TEXT;
+    other_pubk TEXT;
+  BEGIN
+    new_pubk := (SELECT user_pubk FROM Blockchain.AddUserTransaction aut
+                 WHERE aut.id = id);
+    -- Create User
+    INSERT INTO Blockchain.CookieUser(pubk) VALUES (new_pubk);
+    -- Create debts
+    FOR other_pubk IN SELECT u.pubk
+                      FROM Blockchain.CookieUser u
+                      WHERE u.pubk != new_pubk AND u.valid LOOP
+      INSERT INTO Blockchain.Debt(sender_pubk, receiver_pubk, cookies_owed)
+        VALUES (other_pubk, new_pubk, 0);
+      INSERT INTO Blockchain.Debt(sender_pubk, receiver_pubk, cookies_owed)
+        VALUES (new_pubk, other_pubk, 0);
+    END LOOP;
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.executeRUT(id INT)
+  RETURNS VOID AS
+  /* Remove a user from the database.
+
+  Arguments:
+  pubk: public key of the user.
+  */
+  $$
+  DECLARE
+    pubk TEXT;
+  BEGIN
+    pubk := (SELECT user_pubk FROM Blockchain.RemoveUserTransaction rut
+             WHERE rut.id = id);
+    UPDATE Blockchain.CookieUser u
+      SET valid = FALSE
+    WHERE u.pubk = pubk;
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
   new_hash TEXT,
@@ -358,14 +435,22 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
   DECLARE
     bid INT;
     protocol VARCHAR(4);
+    insert_time TIMESTAMP;
     tid INT;
+    timeout INTERVAL := INTERVAL '12 hours';
   BEGIN
     -- Create a new block
     INSERT INTO Blockchain.Block(curr_hash, prev_hash)
       VALUES (new_hash, prev_hash);
     bid := (SELECT id FROM Blockchain.Block ORDER BY id DESC LIMIT 1);
     -- Add transactions to the new block if successful
-    FOR tid IN SELECT transaction_id FROM Blockchain.Pool LOOP
+    FOR insert_time, tid IN SELECT insert_time, transaction_id
+                            FROM Blockchain.Pool LOOP
+      -- Check how long the transaction has been in the pool
+      IF (NOW() - insert_time > timeout) THEN
+        DELETE FROM Blockchain.Pool WHERE transaction_id = tid;
+        CONTINUE;
+      END IF;
       protocol := (SELECT protocol
                    FROM Blockchain.Transaction t
                    WHERE t.id = tid);
@@ -376,6 +461,10 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
           SELECT Blockchian.executeRCT(tid);
         ELSEIF (protocol = 'ccct') THEN
           SELECT Blockchian.executeCCCT(tid);
+        ELSEIF (protocol = 'aut') THEN
+          SELECT Blockchain.executeAUT(tid);
+        ELSEIF (protocol = 'rut') THEN
+          SELECT Blockchain.executeRUT(tid);
         END IF;
         -- Insert transaction into the block
         INSERT INTO Blockchain.IncludeTransaction(block, transaction_id)

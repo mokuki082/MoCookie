@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS Blockchain.Transaction (
   */
   id SERIAL PRIMARY KEY,
   protocol VARCHAR(5) NOT NULL,
-  insertion_time TIMESTAMP NOT NULL,
   CONSTRAINT transaction_protocol_check CHECK (protocol IN
     ('gct', 'rct', 'cct', 'ccct', 'pct', 'cpct', 'aut', 'rut'))
 );
@@ -215,7 +214,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.IncludeTransaction (
 CREATE TABLE IF NOT EXISTS Blockchain.Pool (
   /* Shows the transactions that are currently in the pool. */
   transaction_id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
-    ON DELETE CASCADE ON UPDATE CASCADE
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  insertion_time TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.Debt (

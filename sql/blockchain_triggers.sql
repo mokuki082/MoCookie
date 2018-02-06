@@ -318,3 +318,6 @@ CREATE TRIGGER cookieuser_valid_check
   BEFORE UPDATE OF valid ON Blockchain.CookieUser
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.cookieUserValidCheck();
+
+
+-- TODO: Make sure candidates in Combined transaction are the ones in the actual sub-transactions.
