@@ -461,6 +461,8 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
           SELECT Blockchian.executeRCT(tid);
         ELSEIF (protocol = 'ccct') THEN
           SELECT Blockchian.executeCCCT(tid);
+        ELSEIF (protocol = 'cpct') THEN
+          SELECT Blockchian.executeCPCT(tid);
         ELSEIF (protocol = 'aut') THEN
           SELECT Blockchain.executeAUT(tid);
         ELSEIF (protocol = 'rut') THEN
