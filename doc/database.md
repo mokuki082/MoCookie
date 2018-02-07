@@ -1,6 +1,6 @@
 # Database Documentation
 This documentation includes a list of functions that are available to servers. The database is still in progress, test cases are needed.
-## Server Functions
+## Admin Functions
 ### Blockchain.addAddUserTransaction
 Add a `AddUserTransaction` into the pool. The user will be added in the next block commit.
 
@@ -16,6 +16,8 @@ Add a `RemoveUserTransaction` into the pool. The user will be marked as invalid 
 - `user_pubk` *TEXT*: public key of the new user.
 
 **Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
+
+## Server Functions
 
 ### Blockchain.addGiveCookieTransaction
 Add a `GiveCookieTransaction` into the pool. The debt table will be updated in the next block commit.
@@ -76,8 +78,9 @@ Add a `PairCancelTransaction` into the pool. The debt table will be updated in t
 ### Blockchain.commitBlock
 Commit all transactions from the pool into a new block. Note that unsuccessful transactions may be postponed or discarded depending on the exception. If there are no transactions in the pool, a block will not be committed.
 
-**Keyword Arguments**
-- `new_hash` *TEXT*: Hash of the new block
-- `prev_hash` *TEXT*: Hash of the previous block
-
 **Returns** `TRUE` if a block is committed successfully, `FALSE` otherwise.
+
+### Blockchain.getBlockchain
+Get the blockchain information up to a certain hash.
+
+- `last_hash` *TEXT*: Hash of a block of which the information will stop at.

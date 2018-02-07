@@ -1,3 +1,211 @@
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedAUT(tid INT)
+  RETURNS TEXT AS
+  /* get all information associated to a AUT.
+
+  Returns:
+  A string in the format that the protocol is signed.
+  */
+  $$
+  BEGIN
+    RETURN (SELECT FORMAT(E'aut\t%s',user_pubk)
+            FROM Blockchain.AddUserTransaction);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedRUT(tid INT)
+  RETURNS TEXT AS
+  /* get all information associated to a RUT.
+
+  Returns:
+  A string in the format that the protocol is signed.
+  */
+  $$
+  BEGIN
+    RETURN (SELECT FORMAT(E'rut\t%s',user_pubk)
+            FROM Blockchain.RemoveUserTransaction);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedGCT(tid INT)
+  RETURNS TEXT AS
+  /* get all information associated to a CCT.
+
+  Returns:
+  A string in the format that the protocol is signed
+  */
+  $$
+  BEGIN
+    RETURN (SELECT FORMAT('gct\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
+                          invoker,
+                          extract(epoch FROM transaction_time),
+                          receiver,
+                          b.curr_hash,
+                          num_cookies,
+                          reason,
+                          signature)
+            FROM Blockchain.GiveCookieTransaction gct
+            JOIN Blockchain.Block b ON (gct.recent_block = b.id)
+            WHERE gct.id = tid);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedRCT(tid INT)
+  RETURNS TEXT AS
+  /* get all information associated to a RCT.
+
+  Returns:
+  A string in the format that the protocol is signed.
+  */
+  $$
+  BEGIN
+    RETURN (SELECT FORMAT('rct\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
+                          invoker,
+                          extract(epoch FROM transaction_time),
+                          sender,
+                          b.curr_hash,
+                          num_cookies,
+                          cookie_type,
+                          signature)
+            FROM Blockchain.ReceiveCookieTransaction rct
+            JOIN Blockchain.Block b ON (rct.recent_block = b.id)
+            WHERE rct.id = tid);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedCCT(tid INT)
+  RETURNS TEXT AS
+  /* get all information associated to a CCT.
+
+  Returns:
+  A string in the format that the protocol is signed.
+  */
+  $$
+  BEGIN
+    RETURN (SELECT FORMAT('cct\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
+                          invoker,
+                          extract(epoch FROM transaction_time),
+                          b.curr_hash,
+                          start_user,
+                          mid_user,
+                          end_user,
+                          num_cookies,
+                          signature)
+            FROM Blockchain.ChainCollapseTransaction cct
+            JOIN Blockchain.CombinedChainCollapseTransaction ccct
+              ON (cct.id = ccct.start_user_transaction OR
+                  cct.id = ccct.mid_user_transaction OR
+                  cct.id = ccct.end_user_transaction)
+            JOIN Blockchain.Block b ON (cct.recent_block = b.id)
+            WHERE cct.id = tid);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedPCT(tid INT)
+  RETURNS TEXT AS
+  /* get all information associated to a PCT.
+
+  Returns:
+  A string in the format that the protocol is signed.
+  */
+  $$
+  BEGIN
+    RETURN (SELECT FORMAT('pct\t%s\t%s\t%s\t%s\t%s\t%s',
+                          invoker,
+                          other,
+                          extract(epoch FROM transaction_time),
+                          CASE WHEN pct.id = cpct.user_a_transaction
+                            THEN cpct.user_b
+                            ELSE cpct.user_a
+                          END, -- other
+                          num_cookies,
+                          signature)
+            FROM Blockchain.PairCancelTransaction pct
+            JOIN Blockchain.CombinedPairCancelTransaction cpct
+              ON (pct.id = cpct.user_a_transaction OR
+                  pct.id = cpct.user_b_transaction)
+            JOIN Blockchain.Block b ON (cct.recent_block = b.id)
+            WHERE cct.id = tid);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
+  RETURNS TEXT AS
+  /* Generate a string in this format:
+
+  prev\t<hash>\n
+  t1\n
+  t2\n
+  ...
+  tn\n
+  */
+  $$
+  DECLARE
+    plaintext TEXT := '';
+    partial_plaintext TEXT;
+    tid INT;
+    protocol VARCHAR(4);
+  BEGIN
+  SELECT CONCAT('prev\t', curr_hash,'\n') INTO plaintext
+    FROM Blockchain.Block
+    WHERE id < bid
+    ORDER BY id DESC
+    LIMIT 1;
+  FOR tid, protocol IN SELECT transaction_id, t.protocol
+                       FROM Blockchain.IncludeTransaction
+                       JOIN Blockchain.Transaction t ON (id = transaction_id)
+                       WHERE block = bid LOOP
+    IF (protocol = 'aut') THEN
+      SELECT Blockchain.getFormattedAUT(tid) INTO partial_plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol = 'rut') THEN
+      SELECT Blockchain.getFormattedRUT(tid) INTO partial_plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol == 'gct') THEN
+      SELECT Blockchain.getFormattedGCT(tid) INTO partial_plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol == 'rct') THEN
+      SELECT Blockchain.getFormattedRCT(tid) INTO partial_plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol == 'ccct') THEN
+      SELECT string_agg(Blockchain.getFormattedCCT(cct.id), E'\n')
+      INTO partial_plaintext
+      FROM Blockchain.CombinedChainCollapseTransaction ccct
+      JOIN Blockchain.ChainCollapseTransaction cct ON
+        (start_user = invoker OR
+         mid_user = invoker OR
+         end_user = invoker)
+      WHERE ccct.id = tid
+      ORDER BY CASE WHEN invoker = start_user THEN 1
+                    WHEN invoker = mid_user THEN 2
+                    WHEN invoker = end_user THEN 3
+               END;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol == 'cpct') THEN
+      SELECT string_agg(Blockchain.getFormattedPCT(pct.id), E'\n')
+      INTO partial_plaintext
+      FROM Blockchain.CombinedPairCancelTransaction cpct
+      JOIN Blockchain.PairCancelTransaction pct ON
+        (user_a = invoker OR user_b = invoker)
+      WHERE cpct.id = tid
+      ORDER BY CASE WHEN invoker = user_a THEN 1
+                    WHEN invoker = user_b THEN 2
+               END;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    END IF;
+  END LOOP;
+  RETURN plaintext;
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+CREATE OR REPLACE FUNCTION Blockchain.generateCurrHash(bid INT)
+  RETURNS TEXT AS
+  /* Generate the hash for a block*/
+  $$
+  BEGIN
+    RETURN encode(digest(getFormattedBlock(bid), 'SHA512'), 'base64');
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
+
 CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   RETURNS INT AS
   /* Create a generic transaction
@@ -137,7 +345,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addReceiveCookieTransaction(
     RETURN TRUE;
   EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION Blockchain.addChainCollapseTransaction(
       invoker TEXT,
@@ -205,7 +413,6 @@ CREATE OR REPLACE FUNCTION Blockchain.addChainCollapseTransaction(
     EXCEPTION WHEN OTHERS THEN RETURN FALSE;
     END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
-
 
 CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
   invoker TEXT,
@@ -483,9 +690,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeRUT(id INT)
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
-CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
-  new_hash TEXT,
-  prev_hash TEXT)
+CREATE OR REPLACE FUNCTION Blockchain.commitBlock()
   RETURNS BOOLEAN AS
   $$
   /* Commit every transaction in the pool
@@ -498,15 +703,18 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
   TRUE if a block is committed successfully, FALSE otherwise.
   */
   DECLARE
+    last_hash TEXT;
     bid INT;
     protocol VARCHAR(4);
     insert_time TIMESTAMPTZ;
     tid INT;
     timeout INTERVAL := INTERVAL '12 hours';
   BEGIN
+
+    SELECT curr_hash INTO last_hash
+      FROM Blockchain.Block ORDER BY id DESC LIMIT 1;
     -- Create a new block
-    INSERT INTO Blockchain.Block(curr_hash, prev_hash)
-      VALUES (new_hash, prev_hash);
+    INSERT INTO Blockchain.Block(prev_hash) VALUES (last_hash);
     SELECT id INTO bid
       FROM Blockchain.Block
       ORDER BY id DESC
@@ -560,51 +768,40 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock(
       DELETE FROM Blockchain.Block WHERE id = bid;
       RETURN FALSE;
     END IF;
+    -- Calculate block's curr_hash
+    UPDATE Blockchain.Block
+      SET curr_hash = Blockchain.generateCurrHash(bid)
+    WHERE id = bid;
     RETURN TRUE;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
-
-CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(hash TEXT)
-  RETURNS TABLE (block_hash TEXT,
-                 transaction_id INT,
-                 transaction_protocol VARCHAR(4)) AS
+CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
+  RETURNS TEXT AS
   /* Return all transaction ids and protocols up to "hash"
 
   Arguments:
-  hash: Return blockchain information up to this hash
+  last_hash: Return blockchain information from this hash onwards.
 
-  Returns:
-  A table containing (block_hash, transaction_id, transaction_protocol)
+  Returns: A string in the following format
+  prev\t<prev_hash>
+  t1\n
+  t2\n
+  ...
+  tn\n
+  prev\t<prev_hash>
+  t1\n
+  ...
   */
   $$
-  SELECT curr_hash, t.id, protocol
-  FROM Blockchain.IncludeTransaction it
-      JOIN Blockchain.Block b ON (block = b.id)
-      JOIN Blockchain.Transaction t ON (transaction_id = t.id)
-  WHERE b.id > (SELECT b2.id
-                FROM Blockchain.Block b2
-                WHERE b2.curr_hash = hash)
-  $$ LANGUAGE sql SECURITY INVOKER;
-
-
-CREATE OR REPLACE FUNCTION Blockchain.getGCT(param_id INT)
-  RETURNS TABLE (invoker TEXT,
-                 ttime DOUBLE PRECISION,
-                 receiver TEXT,
-                 recent_block_hash TEXT,
-                 num_cookies INT,
-                 reason VARCHAR(100),
-                 signature TEXT) AS
-  /* get all information associated to a GCT.
-
-  Returns:
-  A table containing GCT related information
-  */
-  $$
-  SELECT invoker, extract(epoch FROM transaction_time) as ttime,
-         receiver, b.curr_hash, num_cookies, reason, signature
-  FROM Blockchain.GiveCookieTransaction gct
-    JOIN Blockchain.Block b ON (gct.recent_block = b.id)
-  WHERE gct.id = param_id
-  $$ LANGUAGE sql SECURITY INVOKER;
+  DECLARE
+    last_bid INT;
+  BEGIN
+    SELECT id INTO last_bid
+      FROM Blockchain.Block
+      WHERE curr_hash = last_hash;
+    RETURN (SELECT string_agg(Blockchain.getFormattedBlock(id), E'\n')
+      FROM Blockchain.Block
+      WHERE id > last_bid);
+  END
+  $$ LANGUAGE plpgsql SECURITY INVOKER;

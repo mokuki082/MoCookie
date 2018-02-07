@@ -1,5 +1,9 @@
+
 DROP SCHEMA Blockchain CASCADE;
 CREATE SCHEMA IF NOT EXISTS Blockchain;
+
+-- Import pycrypto
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA Blockchain;
 
 CREATE TABLE IF NOT EXISTS Blockchain.CookieUser (
   /* Represents a user in the system.
@@ -44,6 +48,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
   Trigger:
     gct_protocol_check: Ensure all transactions are mutually exclusive.
     gct_user_check: Ensure all users are valid.
+    gct_invoker_receiver_check: invoker cannot be the same as receiver.
   */
   id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
@@ -58,7 +63,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
   -- Key constraint
   CONSTRAINT gct_invoker_ttime_key UNIQUE(invoker, transaction_time),
   -- Check constraint
-  CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0),
+  CONSTRAINT gct_invoker_receiver_check CHECK (invoker != receiver)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
@@ -70,6 +76,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
   Trigger:
     rct_protocol_check: Ensure all transactions are mutually exclusive.
     rct_user_check: Ensure all users are valid.
+    rct_invoker_sender_check: Invoker cannot be the same as sender.
   */
   id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
@@ -84,7 +91,8 @@ CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
   -- Key constraint
   CONSTRAINT rct_invoker_ttime_key UNIQUE(invoker, transaction_time),
   -- Constraints
-  CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0)
+  CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0),
+  CONSTRAINT rct_invoker_sender_check CHECK (invoker != sender)
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
