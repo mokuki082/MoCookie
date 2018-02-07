@@ -4,13 +4,13 @@
 45002 -- Server failure
 */
 
-
+BEGIN TRANSACTION;
 CREATE OR REPLACE FUNCTION Blockchain.blockPrevHashFkey()
   RETURNS trigger AS
   /* Check that the previous_hash is valid. */
   $$
     DECLARE
-      genesis_hash CONSTANT TEXT := '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+      genesis_hash CONSTANT TEXT := 'GENESIS/BLOCK/==============================';
       searched_hash TEXT;
     BEGIN
       IF (NEW.id = 1) THEN
@@ -24,7 +24,9 @@ CREATE OR REPLACE FUNCTION Blockchain.blockPrevHashFkey()
       ELSEIF (NEW.id > 1) THEN
         IF (NEW.prev_hash IS NOT NULL AND
             NEW.prev_hash = (SELECT curr_hash FROM Blockchain.Block
-                             ORDER BY id DESC LIMIT 1)) THEN
+                             WHERE id < NEW.id
+                             ORDER BY id DESC
+                             LIMIT 1)) THEN
           -- Non-genesis block must have previous block's hash as prev_hash
           RETURN NEW;
         ELSE
@@ -43,7 +45,7 @@ CREATE OR REPLACE FUNCTION Blockchain.blockPrevHashFkey()
 DROP TRIGGER IF EXISTS block_prev_hash_fkey ON Blockchain.Block;
 CREATE TRIGGER block_prev_hash_fkey
   /* Check that the previous_hash is valid. */
-  BEFORE INSERT OR UPDATE OF curr_hash, prev_hash ON Blockchain.Block
+  BEFORE INSERT OR UPDATE OF prev_hash ON Blockchain.Block
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.blockPrevHashFkey();
 
@@ -429,3 +431,4 @@ CREATE TRIGGER cpct_individual_transaction_check
                    ON Blockchain.CombinedPairCancelTransaction
   FOR EACH ROW
   EXECUTE PROCEDURE Blockchain.CPCTIndividualTransactionCheck();
+COMMIT;

@@ -1,3 +1,4 @@
+BEGIN TRANSACTION;
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedAUT(tid INT)
   RETURNS TEXT AS
   /* get all information associated to a AUT.
@@ -8,7 +9,8 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedAUT(tid INT)
   $$
   BEGIN
     RETURN (SELECT FORMAT(E'aut\t%s',user_pubk)
-            FROM Blockchain.AddUserTransaction);
+            FROM Blockchain.AddUserTransaction
+            WHERE id = tid);
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -22,7 +24,8 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedRUT(tid INT)
   $$
   BEGIN
     RETURN (SELECT FORMAT(E'rut\t%s',user_pubk)
-            FROM Blockchain.RemoveUserTransaction);
+            FROM Blockchain.RemoveUserTransaction
+            WHERE id = tid);
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -145,7 +148,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
     tid INT;
     protocol VARCHAR(4);
   BEGIN
-  SELECT CONCAT('prev\t', curr_hash, E'\t') INTO plaintext
+  SELECT CONCAT(E'prev\t', curr_hash, E'\n') INTO plaintext
     FROM Blockchain.Block
     WHERE id < bid
     ORDER BY id DESC
@@ -153,21 +156,22 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
   FOR tid, protocol IN SELECT transaction_id, t.protocol
                        FROM Blockchain.IncludeTransaction
                        JOIN Blockchain.Transaction t ON (id = transaction_id)
-                       WHERE block = bid LOOP
+                       WHERE block = bid
+                       ORDER BY transaction_id LOOP
     IF (protocol = 'aut') THEN
       SELECT Blockchain.getFormattedAUT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
     ELSEIF (protocol = 'rut') THEN
       SELECT Blockchain.getFormattedRUT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
-    ELSEIF (protocol == 'gct') THEN
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol = 'gct') THEN
       SELECT Blockchain.getFormattedGCT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
-    ELSEIF (protocol == 'rct') THEN
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol = 'rct') THEN
       SELECT Blockchain.getFormattedRCT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
-    ELSEIF (protocol == 'ccct') THEN
-      SELECT string_agg(Blockchain.getFormattedCCT(cct.id), E'\t')
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol = 'ccct') THEN
+      SELECT string_agg(Blockchain.getFormattedCCT(cct.id), E'\n')
       INTO partial_plaintext
       FROM Blockchain.CombinedChainCollapseTransaction ccct
       JOIN Blockchain.ChainCollapseTransaction cct ON
@@ -179,9 +183,9 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
                     WHEN invoker = mid_user THEN 2
                     WHEN invoker = end_user THEN 3
                END;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
-    ELSEIF (protocol == 'cpct') THEN
-      SELECT string_agg(Blockchain.getFormattedPCT(pct.id), E'\t')
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+    ELSEIF (protocol = 'cpct') THEN
+      SELECT string_agg(Blockchain.getFormattedPCT(pct.id), E'\n')
       INTO partial_plaintext
       FROM Blockchain.CombinedPairCancelTransaction cpct
       JOIN Blockchain.PairCancelTransaction pct ON
@@ -190,7 +194,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
       ORDER BY CASE WHEN invoker = user_a THEN 1
                     WHEN invoker = user_b THEN 2
                END;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
     END IF;
   END LOOP;
   RETURN plaintext;
@@ -202,7 +206,9 @@ CREATE OR REPLACE FUNCTION Blockchain.generateCurrHash(bid INT)
   /* Generate the hash for a block*/
   $$
   BEGIN
-    RETURN encode(digest(getFormattedBlock(bid), 'SHA512'), 'base64');
+    RETURN encode(Blockchain.digest(Blockchain.getFormattedBlock(bid),
+                                    TEXT 'SHA256'),
+                  'base64');
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -271,7 +277,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addRUT(user_pubk TEXT)
       VALUES (tid, NOW(), user_pubk);
     INSERT INTO Blockchain.Pool(transaction_id) VALUES (tid);
     RETURN TRUE;
-  EXCEPTION WHEN OTHERS THEN RETURN FALSE;
+  -- EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -646,7 +652,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeAUT(tid INT)
   and every other users.
 
   Arguments:
-  new_pubk: public key of the user.
+  tid: transaction id of the tid.
   */
   $$
   DECLARE
@@ -670,23 +676,29 @@ CREATE OR REPLACE FUNCTION Blockchain.executeAUT(tid INT)
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.executeRUT(id INT)
+CREATE OR REPLACE FUNCTION Blockchain.executeRUT(tid INT)
   RETURNS VOID AS
   /* Remove a user from the database.
 
   Arguments:
-  pubk: public key of the user.
+  tid: transaction id of the RUT.
   */
   $$
   DECLARE
-    pubk TEXT;
+    del_user TEXT;
   BEGIN
-    SELECT user_pubk INTO pubk
+    SELECT user_pubk INTO del_user
       FROM Blockchain.RemoveUserTransaction rut
-      WHERE rut.id = id;
-    UPDATE Blockchain.CookieUser u
-      SET valid = FALSE
-    WHERE u.pubk = pubk;
+      WHERE rut.id = tid;
+    IF (del_user IN (SELECT pubk FROM Blockchain.CookieUser)) THEN
+      UPDATE Blockchain.CookieUser u
+        SET valid = FALSE
+      WHERE u.pubk = del_user;
+    ELSE
+      RAISE EXCEPTION SQLSTATE '45000' USING
+        MESSAGE = 'User does not exist.';
+    END IF;
+
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -694,10 +706,6 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock()
   RETURNS BOOLEAN AS
   $$
   /* Commit every transaction in the pool
-
-  Arguments:
-  new_hash: Hash of the new block
-  prev_hash: Hash of previous block
 
   Returns:
   TRUE if a block is committed successfully, FALSE otherwise.
@@ -800,17 +808,29 @@ CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
     SELECT id INTO last_bid
       FROM Blockchain.Block
       WHERE curr_hash = last_hash;
-    RETURN (SELECT string_agg(Blockchain.getFormattedBlock(id), E'\t')
-      FROM Blockchain.Block
-      WHERE id > last_bid);
+    RETURN (SELECT string_agg(TRIM(trailing E'\n' FROM
+                              Blockchain.getFormattedBlock(id)),
+                              E'\n') ||
+                   (SELECT E'\n' || E'curr\t' || curr_hash FROM Blockchain.Block
+                   ORDER BY id desc LIMIT 1)
+            FROM Blockchain.Block
+            WHERE id > last_bid);
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
-
+COMMIT;
+BEGIN;
 /*Revoke all privileges for MoCookie from Public*/
 REVOKE ALL PRIVILEGES ON DATABASE MoCookie FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA Blockchain FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA Blockchain FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA Blockchain FROM PUBLIC;
+
+/* Grant permission on stored procedure to admin*/
+GRANT CONNECT ON DATABASE MoCookie TO mc_admin;
+GRANT USAGE ON SCHEMA Blockchain TO mc_admin;
+GRANT EXECUTE ON FUNCTION Blockchain.addAUT(new_pubk TEXT),
+                          Blockchain.addRUT(user_pubk TEXT)
+              TO mc_admin;
 
 /* Grant permission on stored procedure to server*/
 GRANT CONNECT ON DATABASE MoCookie TO mc_server;
@@ -846,3 +866,4 @@ GRANT EXECUTE ON FUNCTION Blockchain.addGCT(invoker TEXT,
                           Blockchain.commitBlock(),
                           Blockchain.getBlockchain(last_hash TEXT)
               TO mc_server;
+COMMIT;

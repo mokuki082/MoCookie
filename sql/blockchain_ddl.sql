@@ -1,4 +1,4 @@
-
+BEGIN TRANSACTION;
 DROP SCHEMA Blockchain CASCADE;
 CREATE SCHEMA IF NOT EXISTS Blockchain;
 
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.RemoveUserTransaction (
   id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
   remove_time TIMESTAMPTZ NOT NULL,
-  user_pubk TEXT REFERENCES Blockchain.CookieUser(pubk) UNIQUE NOT NULL
+  user_pubk TEXT UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.IncludeTransaction (
@@ -243,3 +243,4 @@ CREATE TABLE IF NOT EXISTS Blockchain.Debt (
   CONSTRAINT debt_cookies_owed_check CHECK (cookies_owed >= 0),
   CONSTRAINT debt_sender_receiver_check CHECK (sender_pubk != receiver_pubk)
 );
+COMMIT;

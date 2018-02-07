@@ -7,16 +7,19 @@ all:
 	cat $(DDL) $(TRIG) $(DCL) $(DML) | psql mocookie
 
 ddl:
-	cat $(DDL) | psql mocookie -U mc_admin
+	cat $(DDL) | psql mocookie
 
 trigger:
-	cat $(TRIG) | psql mocookie -U mc_admin
+	cat $(TRIG) | psql mocookie
 
 dcl:
-	cat $(DCL) | psql mocookie -U mc_admin
+	cat $(DCL) | psql mocookie
 
 help:
 	echo 'make: compile all sql files.'
 	echo 'make ddl: compile ddl only.'
 	echo 'make dcl: compile dcl only.'
 	echo 'make trigger: compile triggers only.'
+
+test:
+	cat $(shell ls tests/*.sql) | psql mocookie
