@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS Blockchain.AddUserTransaction (
   id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
   join_time TIMESTAMPTZ NOT NULL,
-  user_pubk TEXT REFERENCES Blockchain.CookieUser(pubk) UNIQUE NOT NULL
+  user_pubk TEXT UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.RemoveUserTransaction (

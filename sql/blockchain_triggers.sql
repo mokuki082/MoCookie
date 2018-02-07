@@ -1,3 +1,10 @@
+/* SQLSTATE MEANING
+45000 -- Transaction temporarily invalid (keep in pool)
+45001 -- Transaction permanently invalid (should be delete from the pool)
+45002 -- Server failure
+*/
+
+
 CREATE OR REPLACE FUNCTION Blockchain.blockPrevHashFkey()
   RETURNS trigger AS
   /* Check that the previous_hash is valid. */
@@ -11,19 +18,24 @@ CREATE OR REPLACE FUNCTION Blockchain.blockPrevHashFkey()
           -- Genesis block must have a all 0 curr_hash and NULL prev_hash
           RETURN NEW;
         ELSE
-          RAISE EXCEPTION 'Genesis block must have NULL prev_hash and all 0 curr_hash.';
+          RAISE EXCEPTION SQLSTATE '45002' USING
+            MESSAGE = 'Genesis block must have NULL prev_hash and all 0 curr_hash.';
         END IF;
       ELSEIF (NEW.id > 1) THEN
         IF (NEW.prev_hash IS NOT NULL AND
             NEW.prev_hash = (SELECT curr_hash FROM Blockchain.Block
-                             WHERE id = NEW.id - 1)) THEN
+                             ORDER BY id DESC LIMIT 1)) THEN
           -- Non-genesis block must have previous block's hash as prev_hash
           RETURN NEW;
         ELSE
-          RAISE EXCEPTION 'Block''s prev_hash does not match.';
+          RAISE EXCEPTION SQLSTATE '45002' USING
+            MESSAGE = 'Block''s prev_hash does not match.';
+
         END IF;
       ELSE
-        RAISE EXCEPTION 'Block id cannot be 0 or negative.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Block id cannot be 0 or negative.';
+
       END IF;
     END
   $$ LANGUAGE plpgsql;
@@ -86,7 +98,8 @@ CREATE OR REPLACE FUNCTION Blockchain.transactionMutualExclCheck()
       IF (occ = 1) THEN
         RETURN NULL;
       ELSE
-        RAISE EXCEPTION 'Transaction is not mutually exclusive.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Transaction is not mutually exclusive.';
       END IF;
     END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -169,7 +182,7 @@ CREATE OR REPLACE FUNCTION Blockchain.isValidUser(k TEXT)
   */
   $$
   BEGIN
-    RETURN (SELECT valid FROM CookieUser WHERE pubk = k);
+    RETURN (SELECT valid FROM Blockchain.CookieUser WHERE pubk = k);
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -181,7 +194,8 @@ CREATE OR REPLACE FUNCTION Blockchain.GCTUserCheck()
     IF ((SELECT Blockchain.isValidUser(NEW.invoker)) AND
         (SELECT Blockchain.isValidUser(NEW.receiver))) THEN
       RETURN NEW;
-    ELSE RAISE EXCEPTION 'User is invalid.';
+    ELSE RAISE EXCEPTION SQLSTATE '45001' USING
+      MESSAGE = 'User is invalid.';
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -202,7 +216,8 @@ CREATE OR REPLACE FUNCTION Blockchain.RCTUserCheck()
     IF ((SELECT Blockchain.isValidUser(NEW.invoker)) AND
         (SELECT Blockchain.isValidUser(NEW.sender))) THEN
       RETURN NEW;
-    ELSE RAISE EXCEPTION 'User is invalid.';
+    ELSE RAISE EXCEPTION SQLSTATE '45001' USING
+      MESSAGE = 'User is invalid.';
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -222,7 +237,8 @@ CREATE OR REPLACE FUNCTION Blockchain.CCTUserCheck()
   BEGIN
     IF ((SELECT Blockchain.isValidUser(NEW.invoker))) THEN
       RETURN NEW;
-    ELSE RAISE EXCEPTION 'User is invalid.';
+    ELSE RAISE EXCEPTION SQLSTATE '45001' USING
+      MESSAGE = 'User is invalid.';
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -243,7 +259,9 @@ CREATE OR REPLACE FUNCTION Blockchain.CCCTUserCheck()
         (SELECT Blockchain.isValidUser(NEW.mid_user)) AND
         (SELECT Blockchain.isValidUser(NEW.end_user))) THEN
       RETURN NEW;
-    ELSE RAISE EXCEPTION 'User is invalid.';
+    ELSE RAISE EXCEPTION SQLSTATE '45001' USING
+      MESSAGE = 'User is invalid.';
+
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -264,7 +282,8 @@ CREATE OR REPLACE FUNCTION Blockchain.PCTUserCheck()
   BEGIN
     IF ((SELECT Blockchain.isValidUser(NEW.invoker))) THEN
       RETURN NEW;
-    ELSE RAISE EXCEPTION 'User is invalid.';
+    ELSE RAISE EXCEPTION SQLSTATE '45001' USING
+      MESSAGE = 'User is invalid.';
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -284,7 +303,9 @@ CREATE OR REPLACE FUNCTION Blockchain.CPCTUserCheck()
     IF ((SELECT Blockchain.isValidUser(NEW.user_a)) AND
         (SELECT Blockchain.isValidUser(NEW.user_b))) THEN
       RETURN NEW;
-    ELSE RAISE EXCEPTION 'User is invalid.';
+    ELSE RAISE EXCEPTION SQLSTATE '45001' USING
+      MESSAGE = 'User is invalid.';
+
     END IF;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -305,7 +326,8 @@ CREATE OR REPLACE FUNCTION Blockchain.cookieUserValidCheck()
   BEGIN
     IF (NOT OLD.valid AND NEW.valid) THEN
       -- If the user is changed from invalid -> valid
-      RAISE EXCEPTION 'User cannot be changed to valid';
+      RAISE EXCEPTION SQLSTATE '45002' USING
+        MESSAGE = 'User cannot be changed to valid';
     ELSE
       RETURN NEW;
     END IF;
@@ -331,21 +353,25 @@ CREATE OR REPLACE FUNCTION Blockchain.CCCTIndividualTransactionCheck()
       IF (NOT NEW.start_user = (SELECT invoker
                                 FROM Blockchain.ChainCollapseTransaction
                                 WHERE id = NEW.start_user_transaction)) THEN
-        RAISE EXCEPTION 'Incorrect start_user.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Incorrect start_user.';
       END IF;
     END IF;
     IF (NEW.mid_user_transaction IS NOT NULL) THEN
       IF (NOT NEW.mid_user = (SELECT invoker
                               FROM Blockchain.ChainCollapseTransaction
                               WHERE id = NEW.mid_user_transaction)) THEN
-        RAISE EXCEPTION 'Incorrect mid_user.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Incorrect mid_user.';
+
       END IF;
     END IF;
     IF (NEW.end_user_transaction IS NOT NULL) THEN
       IF (NOT NEW.end_user = (SELECT invoker
                               FROM Blockchain.ChainCollapseTransaction
                               WHERE id = NEW.end_user_transaction)) THEN
-        RAISE EXCEPTION 'Incorrect end_user.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Incorrect end_user.';
       END IF;
     END IF;
     RETURN NEW;
@@ -377,14 +403,16 @@ CREATE OR REPLACE FUNCTION Blockchain.CPCTIndividualTransactionCheck()
       IF (NOT NEW.user_a = (SELECT invoker
                             FROM Blockchain.PairCancelTransaction
                             WHERE id = NEW.user_a_transaction)) THEN
-        RAISE EXCEPTION 'Incorrect user A.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Incorrect user A.';
       END IF;
     END IF;
     IF (NEW.user_b_transaction IS NOT NULL) THEN
       IF (NOT NEW.user_b = (SELECT invoker
                             FROM Blockchain.PairCancelTransaction
                             WHERE id = NEW.user_b_transaction)) THEN
-        RAISE EXCEPTION 'Incorrect user B.';
+        RAISE EXCEPTION SQLSTATE '45002' USING
+          MESSAGE = 'Incorrect user B.';
       END IF;
     END IF;
     RETURN NEW;
