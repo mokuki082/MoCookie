@@ -21,11 +21,14 @@ CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION Blockchain.addAddUserTransaction(new_pubk TEXT)
-  RETURNS VOID AS
+  RETURNS BOOLEAN AS
   /* Add a AddUserTransaction and put it into the pool.
 
   Arguments:
   new_pubk: public key of the user.
+
+  Returns:
+  TRUE if the transaction is added, FALSE otherwise.
   */
   $$
   DECLARE
@@ -35,15 +38,21 @@ CREATE OR REPLACE FUNCTION Blockchain.addAddUserTransaction(new_pubk TEXT)
     INSERT INTO Blockchain.AddUserTransaction(id, join_time, user_pubk)
       VALUES (tid, NOW(), new_pubk);
     INSERT INTO Blockchain.Pool(transaction_id) VALUES (tid);
+    RETURN TRUE;
+  EXCEPTION
+    WHEN OTHERS THEN RETURN FALSE;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE OR REPLACE FUNCTION Blockchain.addRemoveUserTransaction(user_pubk TEXT)
-  RETURNS VOID AS
+  RETURNS BOOLEAN AS
   /* Add a RemoveUserTransaction and put it into the pool.
 
   Arguments:
   user_pubk: public key of the user.
+
+  Returns:
+  TRUE if the transaction is added, FALSE otherwise.
   */
   $$
   DECLARE
@@ -53,6 +62,8 @@ CREATE OR REPLACE FUNCTION Blockchain.addRemoveUserTransaction(user_pubk TEXT)
     INSERT INTO Blockchain.RemoveUserTransaction(id, remove_time, user_pubk)
       VALUES (tid, NOW(), user_pubk);
     INSERT INTO Blockchain.Pool(transaction_id) VALUES (tid);
+    RETURN TRUE;
+  EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
@@ -64,7 +75,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addGiveCookieTransaction(
       num_cookies INT,
       reason VARCHAR(100),
       signature TEXT)
-  RETURNS VOID AS
+  RETURNS BOOLEAN AS
   $$
     DECLARE
       tid INT;
@@ -87,6 +98,8 @@ CREATE OR REPLACE FUNCTION Blockchain.addGiveCookieTransaction(
                   signature);
       -- Add transaction into pool
       INSERT INTO Blockchain.Pool VALUES (tid);
+      RETURN TRUE;
+    EXCEPTION WHEN OTHERS THEN RETURN FALSE;
     END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
@@ -98,7 +111,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addReceiveCookieTransaction(
       num_cookies INT,
       cookie_type VARCHAR(100),
       signature TEXT)
-  RETURNS VOID AS
+  RETURNS BOOLEAN AS
   $$
   DECLARE
     tid INT;
@@ -121,6 +134,8 @@ CREATE OR REPLACE FUNCTION Blockchain.addReceiveCookieTransaction(
                 signature);
     -- Add transaction to Pool
     INSERT INTO Blockchain.Pool VALUES (tid);
+    RETURN TRUE;
+  EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
 $$ LANGUAGE plpgsql SECURITY INVOKER;
 
@@ -133,7 +148,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addChainCollapseTransaction(
       end_user TEXT,
       num_cookies INT,
       signature TEXT)
-  RETURNS VOID AS
+  RETURNS BOOLEAN AS
   $$
     DECLARE
       tid INT;
@@ -186,6 +201,8 @@ CREATE OR REPLACE FUNCTION Blockchain.addChainCollapseTransaction(
         SET end_user_transaction = tid
         WHERE ccct.id = ccct_id;
       END IF;
+      RETURN TRUE;
+    EXCEPTION WHEN OTHERS THEN RETURN FALSE;
     END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 
@@ -197,7 +214,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
   recent_hash TEXT,
   num_cookies INT,
   signature TEXT)
-  RETURNS VOID AS
+  RETURNS BOOLEAN AS
   $$
   DECLARE
     tid INT;
@@ -234,6 +251,8 @@ CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
       SET user_b_transaction = tid
       WHERE cpct.id = cpct_id;
     END IF;
+    RETURN TRUE;
+  EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
   $$ LANGUAGE plpgsql SECURITY INVOKER;
 

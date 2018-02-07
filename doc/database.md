@@ -7,7 +7,7 @@ Add a `AddUserTransaction` into the pool. The user will be added in the next blo
 **Keyword Arguments**
 - `new_pubk` *TEXT*: public key of the new user.
 
-**Returns** Void
+**Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
 ### Blockchain.addRemoveUserTransaction
 Add a `RemoveUserTransaction` into the pool. The user will be marked as invalid after the next block commit.
@@ -15,7 +15,7 @@ Add a `RemoveUserTransaction` into the pool. The user will be marked as invalid 
 **Keyword Arguments**
 - `user_pubk` *TEXT*: public key of the new user.
 
-**Returns** Void
+**Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
 ### Blockchain.addGiveCookieTransaction
 Add a `GiveCookieTransaction` into the pool. The debt table will be updated in the next block commit.
@@ -29,7 +29,7 @@ Add a `GiveCookieTransaction` into the pool. The debt table will be updated in t
 - `reason` *VARCHAR(100)*: Reason of giving the cookie (optional).
 - `signature` *TEXT*: The entire transaction hashed then encrypted by the invoker's private key.
 
-**Returns** Void
+**Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
 ### Blockchain.addReceiveCookieTransaction
 Add a `GiveCookieTransaction` into the pool. The debt table will be updated in the next block commit.
@@ -43,7 +43,7 @@ Add a `GiveCookieTransaction` into the pool. The debt table will be updated in t
 - `cookie_type` *VARCHAR(100)*: Type of cookie received (optional).
 - `signature` *TEXT*: The entire transaction hashed then encrypted by the invoker's private key.
 
-**Returns** Void
+**Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
 ### Blockchain.addChainCollapseTransaction
 Add a `ChainCollapseTransaction` into the pool. The debt table will be updated in the next block commit.
@@ -58,7 +58,7 @@ Add a `ChainCollapseTransaction` into the pool. The debt table will be updated i
 - `num_cookies` *INT*: Number of cookies all three users wish to collapse.
 - `signature` *TEXT*: The entire transaction hashed then encrypted by the invoker's private key.
 
-**Returns** Void
+**Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
 ### Blockchain.addPairCancelTransaction
 Add a `PairCancelTransaction` into the pool. The debt table will be updated in the next block commit.
@@ -71,10 +71,10 @@ Add a `PairCancelTransaction` into the pool. The debt table will be updated in t
 - `num_cookies` *INT*: Number of cookies all three users wish to collapse.
 - `signature` *TEXT*: The entire transaction hashed then encrypted by the invoker's private key.
 
-**Returns** Void
+**Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
 ### Blockchain.commitBlock
-Commit all transactions from the pool into a new block. Note that unsuccessful transactions may be postponed or discarded depending on exception.
+Commit all transactions from the pool into a new block. Note that unsuccessful transactions may be postponed or discarded depending on the exception. If there are no transactions in the pool, a block will not be committed.
 
 **Keyword Arguments**
 - `new_hash` *TEXT*: Hash of the new block
