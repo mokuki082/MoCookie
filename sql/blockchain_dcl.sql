@@ -194,7 +194,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
   invoker TEXT,
   other TEXT,
   transaction_time DOUBLE PRECISION,
-  recent_block INT,
+  recent_hash TEXT,
   num_cookies INT,
   signature TEXT)
   RETURNS VOID AS
