@@ -74,6 +74,7 @@ Add a `PairCancelTransaction` into the pool. The debt table will be updated in t
 **Returns** Void
 
 ### Blockchain.commitBlock
+Commit all transactions from the pool into a new block. Note that unsuccessful transactions may be postponed or discarded depending on exception.
 
 **Keyword Arguments**
 - `new_hash` *TEXT*: Hash of the new block
