@@ -376,7 +376,7 @@ CREATE OR REPLACE FUNCTION Blockchain.CCCTIndividualTransactionCheck()
     END IF;
     RETURN NEW;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS ccct_individual_transaction_check
   ON Blockchain.CombinedChainCollapseTransaction;
@@ -417,7 +417,7 @@ CREATE OR REPLACE FUNCTION Blockchain.CPCTIndividualTransactionCheck()
     END IF;
     RETURN NEW;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS cpct_individual_transaction_check
   ON Blockchain.CombinedPairCancelTransaction;

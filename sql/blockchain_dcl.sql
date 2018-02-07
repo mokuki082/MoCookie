@@ -10,7 +10,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedAUT(tid INT)
     RETURN (SELECT FORMAT(E'aut\t%s',user_pubk)
             FROM Blockchain.AddUserTransaction);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedRUT(tid INT)
   RETURNS TEXT AS
@@ -24,7 +24,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedRUT(tid INT)
     RETURN (SELECT FORMAT(E'rut\t%s',user_pubk)
             FROM Blockchain.RemoveUserTransaction);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedGCT(tid INT)
   RETURNS TEXT AS
@@ -47,7 +47,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedGCT(tid INT)
             JOIN Blockchain.Block b ON (gct.recent_block = b.id)
             WHERE gct.id = tid);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedRCT(tid INT)
   RETURNS TEXT AS
@@ -70,7 +70,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedRCT(tid INT)
             JOIN Blockchain.Block b ON (rct.recent_block = b.id)
             WHERE rct.id = tid);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedCCT(tid INT)
   RETURNS TEXT AS
@@ -98,7 +98,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedCCT(tid INT)
             JOIN Blockchain.Block b ON (cct.recent_block = b.id)
             WHERE cct.id = tid);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedPCT(tid INT)
   RETURNS TEXT AS
@@ -126,7 +126,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedPCT(tid INT)
             JOIN Blockchain.Block b ON (cct.recent_block = b.id)
             WHERE cct.id = tid);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
   RETURNS TEXT AS
@@ -195,7 +195,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
   END LOOP;
   RETURN plaintext;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.generateCurrHash(bid INT)
   RETURNS TEXT AS
@@ -204,7 +204,7 @@ CREATE OR REPLACE FUNCTION Blockchain.generateCurrHash(bid INT)
   BEGIN
     RETURN encode(digest(getFormattedBlock(bid), 'SHA512'), 'base64');
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   RETURNS INT AS
@@ -226,9 +226,9 @@ CREATE OR REPLACE FUNCTION Blockchain.createTransaction(protocol VARCHAR(4))
   RETURN (SELECT id FROM Blockchain.Transaction
           ORDER BY id DESC LIMIT 1);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addAddUserTransaction(new_pubk TEXT)
+CREATE OR REPLACE FUNCTION Blockchain.addAUT(new_pubk TEXT)
   RETURNS BOOLEAN AS
   /* Add a AddUserTransaction and put it into the pool.
 
@@ -250,9 +250,9 @@ CREATE OR REPLACE FUNCTION Blockchain.addAddUserTransaction(new_pubk TEXT)
   EXCEPTION
     WHEN OTHERS THEN RETURN FALSE;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addRemoveUserTransaction(user_pubk TEXT)
+CREATE OR REPLACE FUNCTION Blockchain.addRUT(user_pubk TEXT)
   RETURNS BOOLEAN AS
   /* Add a RemoveUserTransaction and put it into the pool.
 
@@ -273,9 +273,9 @@ CREATE OR REPLACE FUNCTION Blockchain.addRemoveUserTransaction(user_pubk TEXT)
     RETURN TRUE;
   EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addGiveCookieTransaction(
+CREATE OR REPLACE FUNCTION Blockchain.addGCT(
       invoker TEXT,
       transaction_time DOUBLE PRECISION, -- unix time
       receiver TEXT,
@@ -309,9 +309,9 @@ CREATE OR REPLACE FUNCTION Blockchain.addGiveCookieTransaction(
       RETURN TRUE;
     EXCEPTION WHEN OTHERS THEN RETURN FALSE;
     END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addReceiveCookieTransaction(
+CREATE OR REPLACE FUNCTION Blockchain.addRCT(
       invoker TEXT,
       transaction_time DOUBLE PRECISION,
       sender TEXT,
@@ -345,9 +345,9 @@ CREATE OR REPLACE FUNCTION Blockchain.addReceiveCookieTransaction(
     RETURN TRUE;
   EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addChainCollapseTransaction(
+CREATE OR REPLACE FUNCTION Blockchain.addCCT(
       invoker TEXT,
       transaction_time DOUBLE PRECISION,
       recent_hash TEXT,
@@ -412,9 +412,9 @@ CREATE OR REPLACE FUNCTION Blockchain.addChainCollapseTransaction(
       RETURN TRUE;
     EXCEPTION WHEN OTHERS THEN RETURN FALSE;
     END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
+CREATE OR REPLACE FUNCTION Blockchain.addPCT(
   invoker TEXT,
   other TEXT,
   transaction_time DOUBLE PRECISION,
@@ -461,7 +461,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addPairCancelTransaction(
     RETURN TRUE;
   EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.executeGCT(tid INT)
   RETURNS VOID AS
@@ -486,7 +486,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeGCT(tid INT)
         MESSAGE = 'Users are no longer valid.';
     END IF;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.executeRCT(tid INT)
   RETURNS VOID AS
@@ -518,7 +518,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeRCT(tid INT)
         MESSAGE = 'Users no longer valid';
     END IF;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.executeCCCT(tid INT)
   RETURNS VOID AS
@@ -582,7 +582,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeCCCT(tid INT)
         MESSAGE = 'Transaction incomplete.';
     END IF;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.executeCPCT(tid INT)
   RETURNS VOID AS
@@ -638,7 +638,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeCPCT(tid INT)
         MESSAGE = 'Transaction incomplete.';
     END IF;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.executeAUT(tid INT)
   RETURNS VOID AS
@@ -668,7 +668,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeAUT(tid INT)
         VALUES (new_pubk, other_pubk, 0);
     END LOOP;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.executeRUT(id INT)
   RETURNS VOID AS
@@ -688,7 +688,7 @@ CREATE OR REPLACE FUNCTION Blockchain.executeRUT(id INT)
       SET valid = FALSE
     WHERE u.pubk = pubk;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.commitBlock()
   RETURNS BOOLEAN AS
@@ -774,7 +774,7 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock()
     WHERE id = bid;
     RETURN TRUE;
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
   RETURNS TEXT AS
@@ -804,4 +804,45 @@ CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
       FROM Blockchain.Block
       WHERE id > last_bid);
   END
-  $$ LANGUAGE plpgsql SECURITY INVOKER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+/*Revoke all privileges for MoCookie from Public*/
+REVOKE ALL PRIVILEGES ON DATABASE MoCookie FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA Blockchain FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA Blockchain FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA Blockchain FROM PUBLIC;
+
+/* Grant permission on stored procedure to server*/
+GRANT CONNECT ON DATABASE MoCookie TO mc_server;
+GRANT USAGE ON SCHEMA Blockchain TO mc_server;
+GRANT EXECUTE ON FUNCTION Blockchain.addGCT(invoker TEXT,
+                                            transaction_time DOUBLE PRECISION,
+                                            receiver TEXT,
+                                            recent_hash TEXT,
+                                            num_cookies INT,
+                                            reason VARCHAR(100),
+                                            signature TEXT),
+                          Blockchain.addRCT(invoker TEXT,
+                                            transaction_time DOUBLE PRECISION,
+                                            sender TEXT,
+                                            recent_hash TEXT,
+                                            num_cookies INT,
+                                            cookie_type VARCHAR(100),
+                                            signature TEXT),
+                          Blockchain.addCCT(invoker TEXT,
+                                            transaction_time DOUBLE PRECISION,
+                                            recent_hash TEXT,
+                                            start_user TEXT,
+                                            mid_user TEXT,
+                                            end_user TEXT,
+                                            num_cookies INT,
+                                            signature TEXT),
+                          Blockchain.addPCT(invoker TEXT,
+                                            other TEXT,
+                                            transaction_time DOUBLE PRECISION,
+                                            recent_hash TEXT,
+                                            num_cookies INT,
+                                            signature TEXT),
+                          Blockchain.commitBlock(),
+                          Blockchain.getBlockchain(last_hash TEXT)
+              TO mc_server;
