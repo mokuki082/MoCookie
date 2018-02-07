@@ -132,11 +132,11 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
   RETURNS TEXT AS
   /* Generate a string in this format:
 
-  prev\t<hash>\n
-  t1\n
-  t2\n
+  prev\t<hash>\t
+  t1\t
+  t2\t
   ...
-  tn\n
+  tn\t
   */
   $$
   DECLARE
@@ -145,7 +145,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
     tid INT;
     protocol VARCHAR(4);
   BEGIN
-  SELECT CONCAT('prev\t', curr_hash,'\n') INTO plaintext
+  SELECT CONCAT('prev\t', curr_hash, E'\t') INTO plaintext
     FROM Blockchain.Block
     WHERE id < bid
     ORDER BY id DESC
@@ -156,18 +156,18 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
                        WHERE block = bid LOOP
     IF (protocol = 'aut') THEN
       SELECT Blockchain.getFormattedAUT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
     ELSEIF (protocol = 'rut') THEN
       SELECT Blockchain.getFormattedRUT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
     ELSEIF (protocol == 'gct') THEN
       SELECT Blockchain.getFormattedGCT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
     ELSEIF (protocol == 'rct') THEN
       SELECT Blockchain.getFormattedRCT(tid) INTO partial_plaintext;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
     ELSEIF (protocol == 'ccct') THEN
-      SELECT string_agg(Blockchain.getFormattedCCT(cct.id), E'\n')
+      SELECT string_agg(Blockchain.getFormattedCCT(cct.id), E'\t')
       INTO partial_plaintext
       FROM Blockchain.CombinedChainCollapseTransaction ccct
       JOIN Blockchain.ChainCollapseTransaction cct ON
@@ -179,9 +179,9 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
                     WHEN invoker = mid_user THEN 2
                     WHEN invoker = end_user THEN 3
                END;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
     ELSEIF (protocol == 'cpct') THEN
-      SELECT string_agg(Blockchain.getFormattedPCT(pct.id), E'\n')
+      SELECT string_agg(Blockchain.getFormattedPCT(pct.id), E'\t')
       INTO partial_plaintext
       FROM Blockchain.CombinedPairCancelTransaction cpct
       JOIN Blockchain.PairCancelTransaction pct ON
@@ -190,7 +190,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
       ORDER BY CASE WHEN invoker = user_a THEN 1
                     WHEN invoker = user_b THEN 2
                END;
-      SELECT CONCAT(plaintext, partial_plaintext, E'\n') INTO plaintext;
+      SELECT CONCAT(plaintext, partial_plaintext, E'\t') INTO plaintext;
     END IF;
   END LOOP;
   RETURN plaintext;
@@ -785,12 +785,12 @@ CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
 
   Returns: A string in the following format
   prev\t<prev_hash>
-  t1\n
-  t2\n
+  t1\t
+  t2\t
   ...
-  tn\n
+  tn\t
   prev\t<prev_hash>
-  t1\n
+  t1\t
   ...
   */
   $$
@@ -800,7 +800,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
     SELECT id INTO last_bid
       FROM Blockchain.Block
       WHERE curr_hash = last_hash;
-    RETURN (SELECT string_agg(Blockchain.getFormattedBlock(id), E'\n')
+    RETURN (SELECT string_agg(Blockchain.getFormattedBlock(id), E'\t')
       FROM Blockchain.Block
       WHERE id > last_bid);
   END
