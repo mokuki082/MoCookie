@@ -38,7 +38,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedGCT(tid INT)
   */
   $$
   BEGIN
-    RETURN (SELECT FORMAT('gct\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
+    RETURN (SELECT FORMAT(E'gct\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
                           invoker,
                           extract(epoch FROM transaction_time),
                           receiver,
@@ -61,7 +61,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedRCT(tid INT)
   */
   $$
   BEGIN
-    RETURN (SELECT FORMAT('rct\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
+    RETURN (SELECT FORMAT(E'rct\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
                           invoker,
                           extract(epoch FROM transaction_time),
                           sender,
@@ -84,7 +84,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedCCT(tid INT)
   */
   $$
   BEGIN
-    RETURN (SELECT FORMAT('cct\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
+    RETURN (SELECT FORMAT(E'cct\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s',
                           invoker,
                           extract(epoch FROM transaction_time),
                           b.curr_hash,
@@ -112,7 +112,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedPCT(tid INT)
   */
   $$
   BEGIN
-    RETURN (SELECT FORMAT('pct\t%s\t%s\t%s\t%s\t%s\t%s',
+    RETURN (SELECT FORMAT(E'pct\t%s\t%s\t%s\t%s\t%s\t%s',
                           invoker,
                           other,
                           extract(epoch FROM transaction_time),
@@ -277,7 +277,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addRUT(user_pubk TEXT)
       VALUES (tid, NOW(), user_pubk);
     INSERT INTO Blockchain.Pool(transaction_id) VALUES (tid);
     RETURN TRUE;
-  -- EXCEPTION WHEN OTHERS THEN RETURN FALSE;
+  EXCEPTION WHEN OTHERS THEN RETURN FALSE;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -811,7 +811,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getBlockchain(last_hash TEXT)
     RETURN (SELECT string_agg(TRIM(trailing E'\n' FROM
                               Blockchain.getFormattedBlock(id)),
                               E'\n') ||
-                   (SELECT E'\n' || E'curr\t' || curr_hash FROM Blockchain.Block
+                   (SELECT E'\n' || E'head\t' || curr_hash FROM Blockchain.Block
                    ORDER BY id desc LIMIT 1)
             FROM Blockchain.Block
             WHERE id > last_bid);

@@ -45,10 +45,10 @@ CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
   Constraints:
     gct_invoker_ttime_key: Ensure no duplicated transaction.
     gct_num_cookies_check: Number of cookies cannot be 0 or negative.
+    gct_invoker_receiver_check: invoker cannot be the same as receiver.
   Trigger:
     gct_protocol_check: Ensure all transactions are mutually exclusive.
     gct_user_check: Ensure all users are valid.
-    gct_invoker_receiver_check: invoker cannot be the same as receiver.
   */
   id INT PRIMARY KEY REFERENCES Blockchain.Transaction(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
