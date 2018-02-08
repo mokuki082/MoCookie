@@ -35,8 +35,9 @@ CREATE OR REPLACE FUNCTION Test.AUT_add_after_del() RETURNS BOOLEAN AS
   DECLARE
     result BOOLEAN;
   BEGIN
-    SELECT Blockchain.addAUT('aaa123') AND
-           Blockchain.addRUT('aaa123') AND
+    PERFORM Blockchain.addAUT('aaa123');
+    PERFORM Blockchain.commitBlock();
+    SELECT Blockchain.addRUT('aaa123') AND
            Blockchain.commitBlock() AND
            NOT Blockchain.addAUT('aaa123') AND
            NOT Blockchain.commitBlock() INTO result;

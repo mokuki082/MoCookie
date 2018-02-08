@@ -2,6 +2,7 @@
 45000 -- Transaction temporarily invalid (keep in pool)
 45001 -- Transaction permanently invalid (should be delete from the pool)
 45002 -- Server failure
+45003 -- Unit testing abort and rollback
 */
 
 BEGIN TRANSACTION;

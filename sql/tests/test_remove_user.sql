@@ -20,8 +20,9 @@ CREATE OR REPLACE FUNCTION Test.RUT_same_block_removal() RETURNS BOOLEAN AS
     result BOOLEAN;
   BEGIN
     SELECT Blockchain.addAUT('bbb123') AND
-                   Blockchain.addRUT('bbb123') AND
-                   Blockchain.commitBlock() INTO result;
+           Blockchain.addRUT('bbb123') AND
+           Blockchain.commitBlock() AND
+           NOT Blockchain.commitBlocK() INTO result;
     RAISE EXCEPTION SQLSTATE '45003';
   EXCEPTION
     WHEN SQLSTATE '45003' THEN RETURN result;
@@ -34,9 +35,9 @@ CREATE OR REPLACE FUNCTION Test.RUT_same_block_removal_swapped() RETURNS BOOLEAN
     result BOOLEAN;
   BEGIN
     SELECT Blockchain.addRUT('ccc123') AND
-                   Blockchain.addAUT('ccc123') AND
-                   Blockchain.commitBlock() AND
-                   Blockchain.commitBlock() INTO result;
+           Blockchain.addAUT('ccc123') AND
+           Blockchain.commitBlock() AND
+           Blockchain.commitBlock() INTO result;
     RAISE EXCEPTION SQLSTATE '45003';
   EXCEPTION
     WHEN SQLSTATE '45003' THEN RETURN result;
