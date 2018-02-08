@@ -1,6 +1,4 @@
-BEGIN TRANSACTION;
-
-CREATE FUNCTION Test.normal_case() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_normal_case() RETURNS BOOLEAN AS
   $$
   BEGIN
     PERFORM Blockchain.addAUT('aaa123');
@@ -17,7 +15,7 @@ CREATE FUNCTION Test.normal_case() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.negative_cookies() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_negative_cookies() RETURNS BOOLEAN AS
   $$
   BEGIN
     RETURN (SELECT NOT Blockchain.addGCT('aaa123',
@@ -31,7 +29,7 @@ CREATE FUNCTION Test.negative_cookies() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.zero_cookies() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_zero_cookies() RETURNS BOOLEAN AS
   $$
   BEGIN
     RETURN (SELECT NOT Blockchain.addGCT('aaa123',
@@ -45,7 +43,7 @@ CREATE FUNCTION Test.zero_cookies() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.user_not_exist() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_user_not_exist() RETURNS BOOLEAN AS
   $$
   BEGIN
     RETURN (SELECT NOT Blockchain.addGCT('ccc123',
@@ -59,7 +57,7 @@ CREATE FUNCTION Test.user_not_exist() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.invalid_user() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_invalid_user() RETURNS BOOLEAN AS
   $$
   BEGIN
     PERFORM Blockchain.addRUT('aaa123');
@@ -75,7 +73,7 @@ CREATE FUNCTION Test.invalid_user() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.same_user() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_same_user() RETURNS BOOLEAN AS
   $$
   BEGIN
     RETURN (SELECT NOT Blockchain.addGCT('bbb123',
@@ -89,7 +87,7 @@ CREATE FUNCTION Test.same_user() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.invalid_block() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_invalid_block() RETURNS BOOLEAN AS
   $$
   BEGIN
     PERFORM Blockchain.addAUT('ccc123');
@@ -105,7 +103,7 @@ CREATE FUNCTION Test.invalid_block() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Test.repeated_invoker_timestamp() RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION Test.GCT_repeated_invoker_timestamp() RETURNS BOOLEAN AS
   $$
   BEGIN
     PERFORM Blockchain.addAUT('ccc123');
@@ -120,15 +118,3 @@ CREATE FUNCTION Test.repeated_invoker_timestamp() RETURNS BOOLEAN AS
                     NOT Blockchain.commitBlock());
   END
   $$ LANGUAGE plpgsql;
-
-SELECT CONCAT('===TEST REMOVE USER:===', E'\n',
-              'Normal case: ', Test.normal_case(), E'\n',
-              'Negative cookies: ', Test.negative_cookies(), E'\n',
-              'Zero cookies: ', Test.zero_cookies(), E'\n',
-              'User not exist: ', Test.user_not_exist(), E'\n',
-              'Invalid user: ', Test.invalid_user(), E'\n',
-              'Same user: ', Test.same_user(), E'\n',
-              'Invalid block: ', Test.invalid_block(), E'\n',
-              'Repeated invoker timestamp: ', Test.repeated_invoker_timestamp());
-SELECT Blockchain.getBlockchain('GENESIS/BLOCK/==============================');
-ROLLBACK;

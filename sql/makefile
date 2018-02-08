@@ -2,7 +2,6 @@ DDL=blockchain_ddl.sql
 TRIG=blockchain_triggers.sql
 DCL=blockchain_dcl.sql
 DML=blockchain_dml.sql
-TEST=tests/simple_pgtest.sql
 
 all:
 	cat $(DDL) $(TRIG) $(DCL) $(DML) | psql mocookie
@@ -23,4 +22,9 @@ help:
 	echo 'make trigger: compile triggers only.'
 
 test:
-	cat $(TEST) $(shell ls tests/test*.sql) | psql -t mocookie
+	cat tests/header.sql tests/test*.sql tests/trailer.sql | \
+	  psql -t -A mocookie | \
+	  grep '^test' | \
+	  cut -f 2 -d '|' | \
+	  sort | \
+	  awk 'BEGIN {} {print $0; system("echo \"SELECT Test."$$0"\(\);\" | psql -t -A mocookie");} END{}'
