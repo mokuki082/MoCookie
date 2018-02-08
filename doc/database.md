@@ -1,7 +1,7 @@
 # Database Documentation
 This documentation includes a list of functions that are available to servers. The database is still in progress, test cases are needed.
 ## Admin Functions
-### Blockchain.addAddUserTransaction
+### Blockchain.addAUT
 Add a `AddUserTransaction` into the pool. The user will be added in the next block commit.
 
 **Keyword Arguments**
@@ -9,7 +9,7 @@ Add a `AddUserTransaction` into the pool. The user will be added in the next blo
 
 **Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
-### Blockchain.addRemoveUserTransaction
+### Blockchain.addRUT
 Add a `RemoveUserTransaction` into the pool. The user will be marked as invalid after the next block commit.
 
 **Keyword Arguments**
@@ -19,7 +19,7 @@ Add a `RemoveUserTransaction` into the pool. The user will be marked as invalid 
 
 ## Server Functions
 
-### Blockchain.addGiveCookieTransaction
+### Blockchain.addGCT
 Add a `GiveCookieTransaction` into the pool. The debt table will be updated in the next block commit.
 
 **Keyword Arugments**
@@ -33,7 +33,7 @@ Add a `GiveCookieTransaction` into the pool. The debt table will be updated in t
 
 **Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
-### Blockchain.addReceiveCookieTransaction
+### Blockchain.addRCT
 Add a `GiveCookieTransaction` into the pool. The debt table will be updated in the next block commit.
 
 **Keyword Arugments**
@@ -47,7 +47,7 @@ Add a `GiveCookieTransaction` into the pool. The debt table will be updated in t
 
 **Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
-### Blockchain.addChainCollapseTransaction
+### Blockchain.addCCT
 Add a `ChainCollapseTransaction` into the pool. The debt table will be updated in the next block commit.
 
 **Keyword Arugments**
@@ -62,7 +62,7 @@ Add a `ChainCollapseTransaction` into the pool. The debt table will be updated i
 
 **Returns** `TRUE` if transaction is added successfully, `FALSE` otherwise.
 
-### Blockchain.addPairCancelTransaction
+### Blockchain.addPCT
 Add a `PairCancelTransaction` into the pool. The debt table will be updated in the next block commit.
 
 **Keyword Arguments**
