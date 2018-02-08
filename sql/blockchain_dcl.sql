@@ -729,7 +729,8 @@ CREATE OR REPLACE FUNCTION Blockchain.commitBlock()
       LIMIT 1;
     -- Add transactions to the new block if successful
     FOR insert_time, tid IN SELECT p.insert_time, transaction_id
-                            FROM Blockchain.Pool p LOOP
+                            FROM Blockchain.Pool p
+                            ORDER BY p.insert_time LOOP
       -- Check how long the transaction has been in the pool
       IF (NOW() - insert_time > timeout) THEN
         DELETE FROM Blockchain.Pool WHERE transaction_id = tid;

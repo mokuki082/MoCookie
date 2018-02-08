@@ -1,5 +1,5 @@
 BEGIN TRANSACTION;
-CREATE FUNCTION Blockchain.normal_case() RETURNS BOOLEAN AS
+CREATE FUNCTION Test.normal_case() RETURNS BOOLEAN AS
   $$
   BEGIN
     PERFORM Blockchain.addAUT('aaa123');
@@ -9,7 +9,7 @@ CREATE FUNCTION Blockchain.normal_case() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Blockchain.same_block_removal() RETURNS BOOLEAN AS
+CREATE FUNCTION Test.same_block_removal() RETURNS BOOLEAN AS
   $$
   BEGIN
     RETURN (SELECT Blockchain.addAUT('bbb123') AND
@@ -18,7 +18,7 @@ CREATE FUNCTION Blockchain.same_block_removal() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Blockchain.same_block_removal_swapped() RETURNS BOOLEAN AS
+CREATE FUNCTION Test.same_block_removal_swapped() RETURNS BOOLEAN AS
   $$
   BEGIN
     RETURN (SELECT Blockchain.addRUT('ccc123') AND
@@ -28,8 +28,9 @@ CREATE FUNCTION Blockchain.same_block_removal_swapped() RETURNS BOOLEAN AS
   END
   $$ LANGUAGE plpgsql;
 
-SELECT Blockchain.normal_case();
-SELECT Blockchain.same_block_removal();
-SELECT Blockchain.same_block_removal_swapped();
+SELECT CONCAT('===TEST REMOVE USER:===', E'\n',
+              'Normal case: ', Test.normal_case(), E'\n',
+              'Same block removal: ', Test.same_block_removal(), E'\n',
+              'Same block removal swapped: ', Test.same_block_removal_swapped());
 SELECT Blockchain.getBlockchain('GENESIS/BLOCK/==============================');
 ROLLBACK;
