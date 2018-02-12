@@ -67,21 +67,14 @@ CREATE OR REPLACE FUNCTION Test.rct_too_many_cookies() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('aaa123');
     PERFORM Blockchain.addAUT('bbb123');
     PERFORM Blockchain.commitBlock();
-    PERFORM Blockchain.addGCT('aaa123',
-                             1234567,
-                             'bbb123',
+    PERFORM Blockchain.addGCT('aaa123', 1234567, 'bbb123',
                              'GENESIS/BLOCK/==============================',
-                             3,
-                             'why not',
-                             'signature2');
+                             3, 'why not', 'signature2');
     PERFORM Blockchain.commitBlock();
-    SELECT  Blockchain.addRCT('bbb123',
-                             1234567,
-                             'aaa123',
+    SELECT  Blockchain.addRCT('bbb123', 1234567, 'aaa123',
                              'GENESIS/BLOCK/==============================',
                              4, -- more than cookies A owes B
-                             'Why not',
-                             'signature1') AND
+                             'Why not','signature1') AND
             NOT Blockchain.commitBlock() AND -- debt cannot be negative
             Blockchain.addGCT('aaa123',
                              1234568,
@@ -93,8 +86,7 @@ CREATE OR REPLACE FUNCTION Test.rct_too_many_cookies() RETURNS BOOLEAN AS
             Blockchain.commitBlock() AND
             Blockchain.commitBlock() AND
             NOT Blockchain.commitBlock() INTO result;
-    RETURN TRUE;
-    -- RAISE EXCEPTION SQLSTATE '45003';
+    RAISE EXCEPTION SQLSTATE '45003';
   EXCEPTION WHEN SQLSTATE '45003' THEN
     RETURN result;
   END
