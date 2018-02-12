@@ -112,9 +112,8 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedPCT(tid INT)
   */
   $$
   BEGIN
-    RETURN (SELECT FORMAT(E'pct\t%s\t%s\t%s\t%s\t%s\t%s',
+    RETURN (SELECT FORMAT(E'pct\t%s\t%s\t%s\t%s\t%s',
                           invoker,
-                          other,
                           extract(epoch FROM transaction_time),
                           CASE WHEN pct.id = cpct.user_a_transaction
                             THEN cpct.user_b
@@ -126,8 +125,8 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedPCT(tid INT)
             JOIN Blockchain.CombinedPairCancelTransaction cpct
               ON (pct.id = cpct.user_a_transaction OR
                   pct.id = cpct.user_b_transaction)
-            JOIN Blockchain.Block b ON (cct.recent_block = b.id)
-            WHERE cct.id = tid);
+            JOIN Blockchain.Block b ON (pct.recent_block = b.id)
+            WHERE pct.id = tid);
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -192,6 +191,7 @@ CREATE OR REPLACE FUNCTION Blockchain.getFormattedBlock(bid INT)
       JOIN Blockchain.PairCancelTransaction pct ON
         (user_a = invoker OR user_b = invoker)
       WHERE cpct.id = tid
+      GROUP BY cpct.user_a, cpct.user_b, pct.invoker
       ORDER BY CASE WHEN invoker = user_a THEN 1
                     WHEN invoker = user_b THEN 2
                END;
@@ -258,7 +258,6 @@ CREATE OR REPLACE FUNCTION Blockchain.addAUT(new_pubk TEXT)
     WHEN unique_violation THEN RETURN FALSE;
     WHEN SQLSTATE '45000' THEN RETURN FALSE;
     WHEN SQLSTATE '45001' THEN RETURN FALSE;
-    WHEN OTHERS THEN RAISE NOTICE 'exception (code=%): %', SQLCODE, SQLERRM;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -287,7 +286,6 @@ CREATE OR REPLACE FUNCTION Blockchain.addRUT(user_pubk TEXT)
     WHEN check_violation THEN RETURN FALSE;
     WHEN SQLSTATE '45000' THEN RETURN FALSE;
     WHEN SQLSTATE '45001' THEN RETURN FALSE;
-    WHEN OTHERS THEN RAISE NOTICE 'exception (code=%): %', SQLCODE, SQLERRM;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -329,7 +327,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addGCT(
               WHEN check_violation THEN RETURN FALSE;
               WHEN SQLSTATE '45000' THEN RETURN FALSE;
               WHEN SQLSTATE '45001' THEN RETURN FALSE;
-              WHEN OTHERS THEN RAISE NOTICE 'exception (code=%): %', SQLCODE, SQLERRM;
+
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -372,7 +370,7 @@ CREATE OR REPLACE FUNCTION Blockchain.addRCT(
             WHEN check_violation THEN RETURN FALSE;
             WHEN SQLSTATE '45000' THEN RETURN FALSE;
             WHEN SQLSTATE '45001' THEN RETURN FALSE;
-            WHEN OTHERS THEN RAISE NOTICE 'exception (code=%): %', SQLCODE, SQLERRM;
+
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -447,17 +445,17 @@ CREATE OR REPLACE FUNCTION Blockchain.addCCT(
       WHEN check_violation THEN RETURN FALSE;
       WHEN SQLSTATE '45000' THEN RETURN FALSE;
       WHEN SQLSTATE '45001' THEN RETURN FALSE;
-      WHEN OTHERS THEN RAISE NOTICE 'exception (code=%): %', SQLCODE, SQLERRM;
+
     END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION Blockchain.addPCT(
-  invoker TEXT,
-  other TEXT,
-  transaction_time DOUBLE PRECISION,
-  recent_hash TEXT,
-  num_cookies INT,
-  signature TEXT)
+  param_invoker TEXT,
+  param_other TEXT,
+  param_transaction_time DOUBLE PRECISION,
+  param_recent_hash TEXT,
+  param_num_cookies INT,
+  param_signature TEXT)
   RETURNS BOOLEAN AS
   $$
   DECLARE
@@ -471,31 +469,32 @@ CREATE OR REPLACE FUNCTION Blockchain.addPCT(
     -- Obtain block_id
     SELECT id INTO bid
       FROM Blockchain.Block
-      WHERE curr_hash = recent_hash;
+      WHERE curr_hash = param_recent_hash;
     IF (bid IS NULL) THEN
       RETURN FALSE;
     END IF;
     -- Obtain ttime in TIMESTAMPTZ format
-    SELECT to_timestamp(transaction_time) INTO ttime;
+    SELECT to_timestamp(param_transaction_time) INTO ttime;
     -- Create PCT
     -- Create ChainCollapseTransaction
     INSERT INTO Blockchain.PairCancelTransaction(
       id, invoker, transaction_time, recent_block, signature
-      ) VALUES (tid, invoker, ttime, bid, signature);
+    ) VALUES (tid, param_invoker, ttime, bid, param_signature);
     -- Obtain cpct
     SELECT id INTO cpct_id
       FROM Blockchain.CombinedPairCancelTransaction cpct
-      JOIN Blockchain.Pool p ON (cpct.id = pool.transaction_id)
-      WHERE cpct.user_a = other AND
-            cpct.user_b = invoker AND
-            cpct.num_cookies = num_cookies;
+      JOIN Blockchain.Pool p ON (cpct.id = p.transaction_id)
+      WHERE cpct.user_a = param_other AND
+            cpct.user_b = param_invoker AND
+            cpct.num_cookies = param_num_cookies;
     IF (cpct_id IS NULL) THEN
       -- Create a new cpct
       SELECT Blockchain.CreateTransaction('cpct') INTO cpct_id;
       INSERT INTO Blockchain.CombinedPairCancelTransaction (
         id, user_a_transaction, user_b_transaction, user_a, user_b,
         num_cookies
-        ) VALUES (cpct_id, tid, NULL, invoker, other, num_cookies);
+      ) VALUES (cpct_id, tid, NULL, param_invoker, param_other,
+                param_num_cookies);
       -- Insert cpct into the pool
       INSERT INTO Blockchain.Pool VALUES (cpct_id);
     ELSE
@@ -510,7 +509,6 @@ CREATE OR REPLACE FUNCTION Blockchain.addPCT(
     WHEN check_violation THEN RETURN FALSE;
     WHEN SQLSTATE '45000' THEN RETURN FALSE;
     WHEN SQLSTATE '45001' THEN RETURN FALSE;
-    WHEN OTHERS THEN RAISE NOTICE 'exception (code=%): %', SQLCODE, SQLERRM;
   END
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -655,25 +653,23 @@ CREATE OR REPLACE FUNCTION Blockchain.executeCPCT(tid INT)
       IF ((SELECT Blockchain.isValidUser(user_a)) AND
           (SELECT Blockchain.isValidUser(user_b))) THEN
         -- Check that A owes B (and B owes A) enough cookies
-        IF (SELECT d1.num_cookies >= num_cookies AND
-                   d2.num_cookies >= num_cookies
-            FROM Blockchain.Debt d1 JOIN Blockchain.Debt d2 ON
-                 (d1.sender_pubk = d2.sender_pubk AND
-                  d1.receiver_pubk = d2.receiver_pubk)
+        IF (SELECT d1.cookies_owed >= num_cookies AND
+                   d2.cookies_owed >= num_cookies
+            FROM Blockchain.Debt d1, Blockchain.Debt d2
             WHERE d1.sender_pubk = user_a AND
                   d1.receiver_pubk = user_b AND
                   d2.sender_pubk = user_b AND
                   d2.receiver_pubk = user_a) THEN
           -- Decrement the number of cookies A owes B
-          UPDATE Blockchain.Debt d
-          SET d.num_cookies = d.num_cookies - num_cookies
-          WHERE d.sender_pubk = user_a AND
-                d.receiver_pubk = user_b;
+          UPDATE Blockchain.Debt
+          SET cookies_owed = cookies_owed - num_cookies
+          WHERE sender_pubk = user_a AND
+                receiver_pubk = user_b;
           -- Decrement the number of cookies B owes C
-          UPDATE Blockchain.Debt d
-          SET d.num_cookies = d.num_cookies - num_cookies
-          WHERE d.sender_pubk = user_b AND
-                d.receiver_pubk = user_a;
+          UPDATE Blockchain.Debt
+          SET cookies_owed = cookies_owed - num_cookies
+          WHERE sender_pubk = user_b AND
+                receiver_pubk = user_a;
         ELSE
           RAISE EXCEPTION SQLSTATE '45000' USING
             MESSAGE = 'User(s) does not have enough debt.';
