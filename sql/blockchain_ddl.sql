@@ -64,7 +64,9 @@ CREATE TABLE IF NOT EXISTS Blockchain.GiveCookieTransaction (
   CONSTRAINT gct_invoker_ttime_key UNIQUE(invoker, transaction_time),
   -- Check constraint
   CONSTRAINT gct_num_cookies_check CHECK (num_cookies > 0),
-  CONSTRAINT gct_invoker_receiver_check CHECK (invoker != receiver)
+  CONSTRAINT gct_invoker_receiver_check CHECK (invoker != receiver),
+  CONSTRAINT gct_transaction_time_check
+    CHECK (NOW() - transaction_time < INTERVAL '1 hour')
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
@@ -92,7 +94,9 @@ CREATE TABLE IF NOT EXISTS Blockchain.ReceiveCookieTransaction (
   CONSTRAINT rct_invoker_ttime_key UNIQUE(invoker, transaction_time),
   -- Constraints
   CONSTRAINT rct_num_cookies_check CHECK (num_cookies > 0),
-  CONSTRAINT rct_invoker_sender_check CHECK (invoker != sender)
+  CONSTRAINT rct_invoker_sender_check CHECK (invoker != sender),
+  CONSTRAINT gct_transaction_time_check
+    CHECK (NOW() - transaction_time < INTERVAL '1 hour')
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
@@ -112,7 +116,9 @@ CREATE TABLE IF NOT EXISTS Blockchain.ChainCollapseTransaction (
     ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   signature TEXT NOT NULL,
   -- Primary key
-  CONSTRAINT cct_invoker_ttime_key UNIQUE(invoker, transaction_time)
+  CONSTRAINT cct_invoker_ttime_key UNIQUE(invoker, transaction_time),
+  CONSTRAINT gct_transaction_time_check
+    CHECK (NOW() - transaction_time < INTERVAL '1 hour')
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.CombinedChainCollapseTransaction (
@@ -163,7 +169,9 @@ CREATE TABLE IF NOT EXISTS Blockchain.PairCancelTransaction (
     ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
   signature TEXT NOT NULL,
   -- Constraints
-  CONSTRAINT pct_invoker_ttime_key UNIQUE(invoker, transaction_time)
+  CONSTRAINT pct_invoker_ttime_key UNIQUE(invoker, transaction_time),
+  CONSTRAINT gct_transaction_time_check
+    CHECK (NOW() - transaction_time < INTERVAL '1 hour')
 );
 
 CREATE TABLE IF NOT EXISTS Blockchain.CombinedPairCancelTransaction (

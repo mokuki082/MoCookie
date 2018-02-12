@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_normal_case() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('bbb123');
     PERFORM Blockchain.commitBlock();
     SELECT Blockchain.addGCT('aaa123',
-                             1234567,
+                             extract(epoch from now()),
                              'bbb123',
                              'GENESIS/BLOCK/==============================',
                              2,
@@ -29,7 +29,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_negative_cookies() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('bbb123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('aaa123',
-                                 1234568,
+                                 extract(epoch from now()),
                                  'bbb123',
                                  'GENESIS/BLOCK/==============================',
                                  -1,
@@ -51,7 +51,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_zero_cookies() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('bbb123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('aaa123',
-                                 1234569,
+                                 extract(epoch from now()),
                                  'bbb123',
                                  'GENESIS/BLOCK/==============================',
                                  0,
@@ -72,12 +72,12 @@ CREATE OR REPLACE FUNCTION Test.GCT_invoker_not_exist() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('bbb123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('ccc123',
-                                         1234570,
-                                         'bbb123',
-                                         'GENESIS/BLOCK/==============================',
-                                         1,
-                                         'Why not',
-                                         'signature1') AND
+                                 extract(epoch from now()),
+                                 'bbb123',
+                                 'GENESIS/BLOCK/==============================',
+                                 1,
+                                 'Why not',
+                                 'signature1') AND
                    NOT Blockchain.commitBlock() INTO result;
     RAISE EXCEPTION SQLSTATE '45003';
   EXCEPTION
@@ -93,12 +93,12 @@ CREATE OR REPLACE FUNCTION Test.GCT_receiver_not_exist() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('aaa123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('aaa123',
-                                         1234570,
-                                         'ccc123',
-                                         'GENESIS/BLOCK/==============================',
-                                         1,
-                                         'Why not',
-                                         'signature1') AND
+                                 extract(epoch from now()),
+                                 'ccc123',
+                                 'GENESIS/BLOCK/==============================',
+                                 1,
+                                 'Why not',
+                                 'signature1') AND
                    NOT Blockchain.commitBlock() INTO result;
     RAISE EXCEPTION SQLSTATE '45003';
   EXCEPTION
@@ -116,12 +116,12 @@ CREATE OR REPLACE FUNCTION Test.GCT_invalid_invoker() RETURNS BOOLEAN AS
     PERFORM Blockchain.addRUT('aaa123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('aaa123',
-                              1234572,
-                              'bbb123',
-                              'GENESIS/BLOCK/==============================',
-                              1,
-                              'Why not',
-                              'signature1') AND
+                                  extract(epoch from now()),
+                                  'bbb123',
+                                  'GENESIS/BLOCK/==============================',
+                                  1,
+                                  'Why not',
+                                  'signature1') AND
            NOT Blockchain.commitBlock() INTO result;
     RAISE EXCEPTION SQLSTATE '45003';
   EXCEPTION
@@ -139,7 +139,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_invalid_receiver() RETURNS BOOLEAN AS
     PERFORM Blockchain.addRUT('aaa123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('bbb123',
-                              1234572,
+                              extract(epoch from now()),
                               'aaa123',
                               'GENESIS/BLOCK/==============================',
                               1,
@@ -160,7 +160,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_same_user() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('aaa123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('aaa123',
-                                  1234572,
+                                  extract(epoch from now()),
                                   'aaa123',
                                   'GENESIS/BLOCK/==============================',
                                   1,
@@ -182,7 +182,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_invalid_block() RETURNS BOOLEAN AS
     PERFORM Blockchain.addAUT('bbb123');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('ccc123',
-                                  1234572,
+                                  extract(epoch from now()),
                                   'bbb123',
                                   'INVALID/BLOCK/==============================',
                                   1,
@@ -205,7 +205,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_repeated_invoker_timestamp() RETURNS BOOLEAN
     PERFORM Blockchain.commitBlock();
     PERFORM Blockchain.addGCT(
                         'aaa123',
-                        1234567,
+                        extract(epoch from now()),
                         'bbb123',
                         'INVALID/BLOCK/==============================',
                         1,
@@ -213,7 +213,7 @@ CREATE OR REPLACE FUNCTION Test.GCT_repeated_invoker_timestamp() RETURNS BOOLEAN
                         'signature1');
     PERFORM Blockchain.commitBlock();
     SELECT NOT Blockchain.addGCT('aaa123',
-                         1234567,
+                         extract(epoch from now()),
                          'bbb123',
                          'INVALID/BLOCK/==============================',
                          1,
